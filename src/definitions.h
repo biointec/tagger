@@ -31,7 +31,7 @@
 #define VERSION_NUMBER_TAGGER 1     // The version number
 #define SUB_VERSION_NUMBER_TAGGER 0 // The sub version number
 #define TAGGER_BUILD_INDEX_TAG 1   // the tag for building the index
-#define DEFAULT_SEED_LENGTH 100 // The default seed length for the FM-index
+#define DEFAULT_SEED_LENGTH 0 // The default seed length for the FM-index
 #define DEFAULT_MAX_LF 0        // The default maximum LF steps for tag subsampling
 #define DEFAULT_L 25        // The default minimum SMEM length
 // increment these tags if you change buildhelpers.cpp, buildfmindex.cpp or

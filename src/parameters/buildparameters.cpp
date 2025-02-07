@@ -248,37 +248,6 @@ class HelpOption : public BuildParameterOption {
     }
 };
 
-class SeedLengthOption : public BuildParameterOption {
-  public:
-    SeedLengthOption()
-        : BuildParameterOption("l", "seed-length", true, INTEGER, ADVANCED) {
-    }
-
-    void process(const std::string& arg,
-                 BuildParameters& params) const override {
-        length_t seedLength = params.seedLength;
-        try {
-            seedLength = std::stoi(arg);
-        } catch (...) {
-            logger.logWarning("Seed length should be an integer." +
-                              ignoreMessage());
-        }
-        if (seedLength < 0) {
-            logger.logWarning("Seed length should be a positive integer." +
-                              ignoreMessage());
-            seedLength = params.seedLength;
-        }
-        params.seedLength = seedLength;
-    }
-
-    std::string getDescription() const override {
-        return "Seed length for replacing non-ACGT characters. Seed length "
-               "0 means that no seed is used. By default the seed length "
-               "is " +
-               std::to_string(DEFAULT_SEED_LENGTH);
-    }
-};
-
 class ReferenceBaseNameOption : public BuildParameterOption {
   public:
     ReferenceBaseNameOption()
@@ -372,7 +341,6 @@ const std::vector<std::shared_ptr<Option>> ParametersInterface::options = {
     std::make_shared<PreprocessOnlyOption>(),
     std::make_shared<TaggingCategoriesOption>(),
     std::make_shared<MaxLFOption>(),
-    std::make_shared<SeedLengthOption>(),
     std::make_shared<ReferenceBaseNameOption>(),
     std::make_shared<FastaFilesOption>(),
     std::make_shared<TextFileWithFastaOption>(),

@@ -11,8 +11,6 @@ start_time=$(date +%s)
 tagger_build_exe="./tagger_build"
 big_bwt_exe="./../external/Big-BWT/bigbwt"
 
-# Default seed length
-seedLength=100
 taggingCategories=""
 
 # Optional Big-BWT parameters
@@ -27,7 +25,7 @@ maxLFValues=()
 
 # Function to show usage
 showUsage() {
-	echo "Usage: $0 [-l <seedLength>] [-w <ws>] [-p <mod>] -r <index_name> [-f <fasta_files>] [-F <fasta_file_list>] [-t <taggingCategoriesFile>] [-M <maxLFSteps>]"
+	echo "Usage: $0 [-w <ws>] [-p <mod>] -r <index_name> [-f <fasta_files>] [-F <fasta_file_list>] [-t <taggingCategoriesFile>] [-M <maxLFSteps>]"
 	echo
 	echo "Required arguments:"
 	echo "  -r <index_name>   Name/location of the index to be created."
@@ -35,7 +33,6 @@ showUsage() {
 	echo "Optional arguments:"
 	echo "  -f <fasta_files>  Space-separated list of FASTA files."
 	echo "  -F <fasta_file_list>  Path to a file containing a list of FASTA files, one per line."
-	echo "  -l <seedLength>   Seed length for replacing non-ACGT characters (default: $seedLength). 0 means that no seed is used."
 	echo "  -w <ws>           Window size for Big-BWT. If unset, Big-BWT will use its default window size."
 	echo "  -p <mod>          Mod value for Big-BWT. If unset, Big-BWT will use its default mod value."
 	echo "  -t <taggingCategoriesFile>  File with tagging categories for the input file."
@@ -58,11 +55,8 @@ runCommand() {
 # Function to parse command-line options
 parseOptions() {
 	# Parse command-line options
-	while getopts ":l:r:f:F:w:p:t:M:" opt; do
+	while getopts ":r:f:F:w:p:t:M:" opt; do
 		case $opt in
-		l)
-			seedLength=$OPTARG
-			;;
 		t)
 			taggingCategories=$OPTARG
 			;;
@@ -142,7 +136,6 @@ for file in "${fasta_files[@]}"; do
   echo "  $file"
   ((count++))
 done
-echo "Seed length: $seedLength"
 echo "Tagging categories file: $taggingCategories"
 echo "Big-BWT window size: ${ws:-not set}"
 echo "Big-BWT mod value: ${mod:-not set}"
@@ -151,7 +144,7 @@ echo "-------------------------------------------------------------"
 
 # Start the preprocessing
 echo "Start preprocessing the fasta file(s) with tagger..."
-runCommand "$tagger_build_exe" --preprocess -l "$seedLength" -r "$index_name" -f "${fasta_files[@]}" --taggingcategories "$taggingCategories" 
+runCommand "$tagger_build_exe" --preprocess -r "$index_name" -f "${fasta_files[@]}" --taggingcategories "$taggingCategories" 
 echo "Preprocessing done!"
 echo "-------------------------------------------------------------"
 

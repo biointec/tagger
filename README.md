@@ -64,19 +64,18 @@ Key options:
 - `-f` / `--fasta-files`: Space-separated list of FASTA files containing reference sequences. Supports `.fa`, `.fna`, `.fasta` extensions. Can use `/path/to/directory/*.ext` to include all matching files.  
 - `-F` / `--text-file-with-fasta`: File containing paths to FASTA files (one per line). Supports `.fa`, `.fna`, `.fasta` extensions.  
 - `-r` / `--reference-base-name`: Name for the generated index (required).  
-- `-t` / `--taggingcategories`: File containing the tagging categories (required).  
-- `-l` / `--seed-length`: Seed length for replacing non-ACGT characters (default: 100, 0 means no seed).  
+- `-t` / `--taggingcategories`: File containing the tagging categories (required).   
 - `-M` / `--max-LF`: Space-separated list of maximum LF steps allowed to find a sampled tag (default: 0, meaning no subsampling).  
 
 **PFP Mode:**  
 ```bash
-bash tagger_build_pfp.sh -r <index_name> [-f <fasta_files>] [-F <fasta_file_list>] [-l <seedLength>] [-w <ws>] [-p <mod>] [-t <taggingCategoriesFile>] [-M <maxLFSteps>]
+bash tagger_build_pfp.sh -r <index_name> [-f <fasta_files>] [-F <fasta_file_list>] [-w <ws>] [-p <mod>] [-t <taggingCategoriesFile>] [-M <maxLFSteps>]
 ```
 
 or  
 
 ```bash
-bash columba_build_pfp.sh -r <index_name> [-F <fasta_file_list>] [-l <seedLength>] [-w <ws>] [-p <mod>] [-t <taggingCategoriesFile>] [-M <maxLFSteps>]
+bash columba_build_pfp.sh -r <index_name> [-F <fasta_file_list>] [-w <ws>] [-p <mod>] [-t <taggingCategoriesFile>] [-M <maxLFSteps>]
 ```
 
 Required argument:
@@ -86,18 +85,11 @@ Required argument:
 Optional arguments:
 - `-f <fasta_files>`: Space-separated list of FASTA files.
 - `-F <fasta_file_list>`: Path to a file containing a list of FASTA files, one per line.
-- `-l <seedLength>`: Seed length for replacing non-ACGT characters (default: 100). 0 means no seed is used.
 - `-w <ws>`: Window size for Big-BWT. If unset, Big-BWT will use its default window size.
 - `-p <mod>`: Mod value for Big-BWT. If unset, Big-BWT will use its default mod value.
 - `-M <maxLFSteps>`: Space-separated list of maximum LF steps for subsampling the tag samples.
 
-**Note**: If you encounter hash collisions during Big-BWT processing, try increasing the window size (`-w`) and/or the mod value (`-p`) to resolve the issue.  
-
-#### Seeded Replacement  
-
-To improve memory usage when working with references that contain large blocks of non-ACGT characters, tagger uses seeded replacement. This ensures that non-ACGT characters are replaced in a predictable way to avoid the inefficiencies caused by randomness.
-
-Use the `-l <seed_length>` option to specify the seed length (default is 100).
+**Note**: If you encounter hash collisions during Big-BWT processing, try increasing the window size (`-w`) and/or the mod value (`-p`) to resolve the issue.
 
 ### Read Classification  
 
