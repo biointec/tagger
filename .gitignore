@@ -1,0 +1,10 @@
+Debug/*
+*.vcxproj.*
+build/*
+*.code-workspace
+*.sa
+.vscode/*
+text.txt
+.cache/*
+benchmarks/*
+build_*

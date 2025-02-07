@@ -1,0 +1,7 @@
+Changes in release 0.2.0
+
+  - Added in-place mode (now default)
+  - Added support for large alphabets
+  - More convenient way of specifying RAM
+    usage (the argument of the -m flag)
+  - Expanded README
