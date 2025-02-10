@@ -36,7 +36,7 @@ set(COMMON_FLAGS "-Wall -pedantic -mpopcnt -std=gnu++11")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${COMMON_FLAGS}")
 
 # Set default 32-bit or 64-bit type
-set(THIRTY_TWO_DEFAULT ON) # todolore
+set(THIRTY_TWO_DEFAULT OFF)
 
 option(THIRTY_TWO "Use 32-bit types" ${THIRTY_TWO_DEFAULT})
 if(THIRTY_TWO)
