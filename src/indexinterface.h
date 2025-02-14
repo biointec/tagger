@@ -55,8 +55,6 @@ class IndexInterface {
     const std::string baseFile; // The base file of the reference text
     length_t textLength;        // the length of the text
 
-    std::vector<length_t> counts; // the counts array of the reference genome
-
     Alphabet<ALPHABET> sigma; // the alphabet
 
     // direction variables

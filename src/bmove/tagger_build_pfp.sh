@@ -166,7 +166,7 @@ echo "Prefix-free parsing done!"
 echo "-------------------------------------------------------------"
 
 # Adjust the arguments for the reverse string
-big_bwt_args=("$big_bwt_exe" -e -s -v "${base}.rev")
+big_bwt_args=("$big_bwt_exe" -v "${base}.rev")
 if [ "$ws" -gt 0 ]; then
 	big_bwt_args+=(-w "$ws")
 fi
@@ -194,9 +194,7 @@ echo "Remove temporary files..."
 rm "${base}.bwt"
 rm "${base}.rev.bwt"
 rm "${base}.ssa"
-rm "${base}.rev.ssa"
 rm "${base}.esa"
-rm "${base}.rev.esa"
 rm "${base}.log"
 rm "${base}.rev.log"
 rm "${base}"

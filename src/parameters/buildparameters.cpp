@@ -2,6 +2,7 @@
 #include "../logger.h"
 #include "parameters.h"
 #include <array>
+#include <cstdlib>
 #include <fstream>
 #include <string>
 
@@ -176,7 +177,7 @@ class TaggingCategoriesOption : public BuildParameterOption {
     }
 
     std::string getDescription() const override {
-        return "File containing the tagging categories.";
+        return "File containing the tagging categories for classification.";
     }
 };
 
@@ -382,6 +383,12 @@ BuildParameters BuildParameters::parse(int argc, char** argv) {
                             "with the -r flag!");
             return params;
         }
+    }
+
+    if(params.taggingCategories.empty()){
+        logger.logError("No tagging categories file provided. Please provide a "
+                        "tagging categories file with the -t flag!");
+        exit(1);
     }
 
     logger.logInfo("Index base filename: " + params.baseFN);

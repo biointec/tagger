@@ -32,7 +32,7 @@ class LogFileOption : public ParameterOption {
 class FirstReadsOption : public ParameterOption {
   public:
     FirstReadsOption()
-        : ParameterOption("f", "first-reads-file", true, STRING, REQUIRED) {
+        : ParameterOption("f", "reads-file", true, STRING, REQUIRED) {
     }
 
     void process(const std::string& arg, Parameters& params) const override {
@@ -180,8 +180,7 @@ class KmerSizeOption : public ParameterOption {
     }
 
     std::string getDescription() const override {
-        return "The size of k-mers in the hash table (used as seeds during "
-               "partitioning). Default is 10.";
+        return "The size of k-mers in the hash table. Default is 10.";
     }
 };
 

@@ -111,7 +111,6 @@ void IndexInterface::readMetaAndCounts(const string& baseFile, bool verbose) {
     for (size_t i = 0; i < charCounts.size(); i++) {
         if (charCounts[i] == 0)
             continue;
-        counts.push_back(cumCount);
         cumCount += charCounts[i];
     }
     textLength = cumCount;

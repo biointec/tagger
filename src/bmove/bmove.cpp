@@ -332,7 +332,7 @@ bool BMove::taggingFunction(
 
     while (j >= static_cast<int64_t>(minMEMLength)) {
         int64_t k = j;
-        if (i > j - minMEMLength) {
+        if (i > j - static_cast<int64_t>(minMEMLength)) {
             int64_t jumpStart = j - minMEMLength;
             k = findMEMEndWithLookup(read, jumpStart, j, stepCount);
         }

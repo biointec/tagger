@@ -84,50 +84,30 @@ char replaceNonACGT(char original, std::minstd_rand& gen,
     const std::string validChars = "ACGT";
     if (original != 'A' && original != 'C' && original != 'G' &&
         original != 'T') {
-            if(!foundU && original == 'U') {
-                foundU = true;
-                logger.logWarning("Found 'U' in reference text. Is this an RNA "
-                                  "reference? 'U' will be replaced with 'X'. "
-                                  "This warning will only be shown once.");
-            }
+        if (!foundU && original == 'U') {
+            foundU = true;
+            logger.logWarning("Found 'U' in reference text. Is this an RNA "
+                              "reference? 'U' will be replaced with 'X'. "
+                              "This warning will only be shown once.");
+        }
         return 'X'; // Replace with 'N'
     }
     return original;
 }
 
-/**
- * @brief Replace non-ACGT characters with a seeded ACGT character.
- * @param original The original character.
- * @param gen The random number generator.
- * @param seed The seed for the random number generator.
- * @param seedIndex The index of the seed.
- * @return The replaced character.
- */
-char replaceNonACGTWithSeed(char original, std::minstd_rand& gen,
-                            const std::string& seed, size_t& seedIndex) {
-    throw(std::runtime_error("Seeded replacement not available right now"));
-    if (original != 'A' && original != 'C' && original != 'G' &&
-        original != 'T') {
-        char replacement = seed[seedIndex];
-        seedIndex = (seedIndex + 1) %
-                    seed.length(); // Move to the next character in the seed
-        return replacement;
-    }
-    seedIndex = 0; // Reset seed index
-    return original;
-}
+bool containsCaseInsensitive(const std::string& haystack,
+                             const std::string& needle) {
+    if (needle.empty())
+        return true;
+    if (haystack.size() < needle.size())
+        return false;
 
-bool containsCaseInsensitive(const std::string &haystack, const std::string &needle) {
-    if (needle.empty()) return true;
-    if (haystack.size() < needle.size()) return false;
-
-    auto it = std::search(
-        haystack.begin(), haystack.end(),
-        needle.begin(), needle.end(),
-        [](char ch1, char ch2) {
-            return std::tolower(static_cast<unsigned char>(ch1)) == std::tolower(static_cast<unsigned char>(ch2));
-        }
-    );
+    auto it =
+        std::search(haystack.begin(), haystack.end(), needle.begin(),
+                    needle.end(), [](char ch1, char ch2) {
+                        return std::tolower(static_cast<unsigned char>(ch1)) ==
+                               std::tolower(static_cast<unsigned char>(ch2));
+                    });
 
     return it != haystack.end();
 }
@@ -414,27 +394,11 @@ void writePositionsAndSequenceNames(const string& baseFN,
                                     const vector<length_t>& positions,
                                     const vector<string>& seqNames,
                                     const vector<length_t>& firstSeqIDPerFile) {
-    logger.logInfo("Write positions and sequence names to " + baseFN +
-                   ".pos and " + baseFN + ".sna...");
+    logger.logInfo("Write positions to " + baseFN + ".pos...");
     // Write the positions to disk
     std::ofstream ofs2(baseFN + ".pos", ios::binary);
     ofs2.write((char*)positions.data(), positions.size() * sizeof(length_t));
     ofs2.close();
-
-    // Write the sequence names to disk
-    std::ofstream ofs3(baseFN + ".sna", std::ios::binary);
-    for (const auto& str : seqNames) {
-        size_t len = str.size();
-        ofs3.write(reinterpret_cast<const char*>(&len), sizeof(len));
-        ofs3.write(str.c_str(), len);
-    }
-    ofs3.close();
-
-    // Write the first sequence ID per file to disk
-    std::ofstream ofs4(baseFN + ".fsid", ios::binary);
-    ofs4.write((char*)firstSeqIDPerFile.data(),
-               firstSeqIDPerFile.size() * sizeof(length_t));
-    ofs4.close();
 }
 
 /**
@@ -674,25 +638,11 @@ length_t preprocessFastaFiles(const std::vector<std::string>& fastaFiles,
 
     std::function<char(char, size_t&)> replaceFunc;
 
-    if (seedLength == 0) {
+    replaceFunc = [&gen, &seed](char c, size_t& seedIndex) -> char {
+        return replaceNonACGT(c, gen, seed, seedIndex);
+    };
 
-        replaceFunc = [&gen, &seed](char c, size_t& seedIndex) -> char {
-            return replaceNonACGT(c, gen, seed, seedIndex);
-        };
-
-        logger.logInfo(
-            "Using random (non-seeded) replacement for non-ACGT characters...");
-
-    } else {
-
-        replaceFunc = [&gen, &seed](char c, size_t& seedIndex) -> char {
-            return replaceNonACGTWithSeed(c, gen, seed, seedIndex);
-        };
-
-        logger.logInfo("Using seeded replacement for non-ACGT characters, with "
-                       "a seed length of " +
-                       std::to_string(seedLength));
-    }
+    logger.logInfo("Using X replacement for non-ACGT characters...");
 
     std::vector<length_t> positions; // the start positions of each
     std::vector<string> seqNames;    // the name of each sequence
@@ -723,9 +673,10 @@ length_t preprocessFastaFiles(const std::vector<std::string>& fastaFiles,
         }
 
         // Max 2**16 categories
-        if(taggingCategoriesVec.size() > 65536) {
+        if (taggingCategoriesVec.size() > 65536) {
             logger.logError("Too many tagging categories. Maximum is 65536");
-            throw std::runtime_error("Too many tagging categories. Maximum is 65536");
+            throw std::runtime_error(
+                "Too many tagging categories. Maximum is 65536");
         }
 
         logger.logInfo("Read " + std::to_string(taggingCategoriesVec.size()) +
@@ -1020,20 +971,6 @@ length_t createAndWriteMove(const string& baseFN, const string& BWT,
 }
 
 void writeIntVectorBinary(const std::string& filename,
-                          const std::vector<length_t>& array) {
-    // convert to int_vector
-    uint8_t width =
-        (uint8_t)ceil(log2(*max_element(array.begin(), array.end())));
-    sdsl::int_vector<> intVector(array.size(), 0, width);
-    for (size_t i = 0; i < array.size(); i++) {
-        intVector[i] = array[i];
-    }
-    std::ofstream ofs(filename, std::ios::binary);
-    intVector.serialize(ofs);
-    ofs.close();
-}
-
-void writeIntVectorBinary(const std::string& filename,
                           const std::vector<uint16_t>& array) {
     // convert to int_vector
     uint8_t width =
@@ -1070,33 +1007,6 @@ void buildSamples(vector<length_t>& samplesFirst, vector<length_t>& samplesLast,
 }
 
 /**
- * Initiates the build for the MovePhi structure.
- *
- * @param tIn The tIn map.
- * @param tOut The tOut map.
- * @param SamplesFirst The samplesFirst array.
- * @param SamplesLast The samplesLast array.
- */
-void startBuildForPhiMove(map<length_t, length_t>& tIn,
-                          map<length_t, length_t>& tOut,
-                          vector<length_t>& samplesFirst,
-                          vector<length_t>& samplesLast) {
-
-    tIn[samplesFirst.front()] = samplesLast.back();
-    tOut[samplesLast.back()] = samplesFirst.front();
-    // Remove the front of the samplesFirst array
-    samplesFirst.erase(samplesFirst.begin());
-    // Remove the back of the samplesLast array
-    samplesLast.pop_back();
-    while (!samplesFirst.empty()) {
-        tIn[samplesFirst.back()] = samplesLast.back();
-        tOut[samplesLast.back()] = samplesFirst.back();
-        samplesFirst.pop_back();
-        samplesLast.pop_back();
-    }
-}
-
-/**
  * Generate predecessor structures
  * @param movePhi MovePhi array
  * @param movePhiInv MovePhiInv array
@@ -1104,23 +1014,14 @@ void startBuildForPhiMove(map<length_t, length_t>& tIn,
  * @param [out] predLast predecessor bitvector of the samplesLast array
  * @param textLength length of the text
  */
-void generatePredecessors(const vector<length_t>& movePhi,
-                          const vector<length_t>& movePhiInv,
-                          SparseBitvec& predFirst, SparseBitvec& predLast,
-                          const length_t textLength) {
+void generatePredecessors(const vector<length_t>& movePhiInv,
+                          SparseBitvec& predLast, const length_t textLength) {
 
-    vector<bool> predFirstBV(textLength + 1, false);
     vector<bool> predLastBV(textLength + 1, false);
-
-    for (const length_t& row : movePhi) {
-        predFirstBV[row > 0 ? row - 1 : textLength - 1] = true;
-    }
 
     for (const length_t& row : movePhiInv) {
         predLastBV[row > 0 ? row - 1 : textLength - 1] = true;
     }
-
-    predFirst = SparseBitvec(predFirstBV);
     predLast = SparseBitvec(predLastBV);
 }
 
@@ -1152,20 +1053,8 @@ void generatePredecessors(const MovePhiReprBP& move, SparseBitvec& pred,
  * @param [out] lastToRun mapping between rank of ones in predLast bitvector and
  * run indices
  */
-void generatePredToRun(const vector<length_t>& samplesFirst,
-                       const vector<length_t>& samplesLast,
-                       vector<length_t>& firstToRun,
+void generatePredToRun(const vector<length_t>& samplesLast,
                        vector<length_t>& lastToRun, length_t textLength) {
-
-    firstToRun.resize(samplesFirst.size());
-    iota(firstToRun.begin(), firstToRun.end(), 0);
-    sort(firstToRun.begin(), firstToRun.end(),
-         [&samplesFirst, &textLength](length_t a, length_t b) {
-             return (samplesFirst[a] > 0 ? samplesFirst[a] - 1
-                                         : textLength - 1) <
-                    (samplesFirst[b] > 0 ? samplesFirst[b] - 1
-                                         : textLength - 1);
-         });
 
     lastToRun.resize(samplesLast.size());
     iota(lastToRun.begin(), lastToRun.end(), 0);
@@ -1174,160 +1063,6 @@ void generatePredToRun(const vector<length_t>& samplesFirst,
              return (samplesLast[a] > 0 ? samplesLast[a] - 1 : textLength - 1) <
                     (samplesLast[b] > 0 ? samplesLast[b] - 1 : textLength - 1);
          });
-}
-
-/**
- * @brief Fill tUnbalanced with unbalanced intervals
- *
- * @param tUnbalanced The map to fill with unbalanced intervals
- * @param tIn The input intervals
- * @param tOut The output intervals
- * @param maxOverlap The maximum overlap allowed
- */
-void fillTUnbalanced(map<length_t, length_t>& tUnbalanced,
-                     const map<length_t, length_t>& tIn,
-                     const map<length_t, length_t>& tOut, length_t maxOverlap) {
-    auto tInIt = tIn.begin();
-    auto tOutIt = tOut.begin();
-
-    while (tOutIt != tOut.end()) {
-        length_t overlapCount = 0;
-        length_t outStart = tOutIt->first;
-        length_t outEnd = (std::next(tOutIt) != tOut.end())
-                              ? std::next(tOutIt)->first
-                              : numeric_limits<length_t>::max();
-
-        // Skip input intervals that are before the current output interval
-        while (tInIt != tIn.end() && tInIt->first < outStart) {
-            ++tInIt;
-        }
-
-        // Determine if there is overlap or if the interval just started
-        if (tInIt == tIn.end() || outStart < tInIt->first) {
-            overlapCount = 1;
-        }
-
-        // Count overlapping input intervals
-        while (tInIt != tIn.end() && tInIt->first < outEnd &&
-               overlapCount < maxOverlap) {
-            ++overlapCount;
-            ++tInIt;
-        }
-
-        // Mark as unbalanced if overlap exceeds maxOverlap
-        if (overlapCount >= maxOverlap) {
-            tUnbalanced[tOutIt->second] = outStart;
-        }
-
-        ++tOutIt;
-    }
-}
-
-/**
- * @brief Balance the intervals
- *
- * @param tUnbalanced The unbalanced intervals
- * @param rows The phi move array (output)
- * @param tIn The input intervals
- * @param tOut The output intervals
- * @param maxOverlap The maximum overlap allowed
- * @param textLength The length of the text
- */
-void balanceIntervals(map<length_t, length_t>& tUnbalanced, MovePhiReprBP& rows,
-                      map<length_t, length_t> tIn, map<length_t, length_t> tOut,
-                      length_t maxOverlap, length_t textLength) {
-    while (!tUnbalanced.empty()) {
-        // Get the first unbalanced interval
-        auto unbalancedIt = tUnbalanced.begin();
-        length_t outStart = unbalancedIt->second;
-        length_t inputStart = unbalancedIt->first;
-
-        // Compute the interval difference for splitting
-        auto nextInputIt = tIn.upper_bound(outStart);
-        ++nextInputIt; // Todolore: this is only correct for maxOverlap = 4
-        length_t intervalDiff = nextInputIt->first - outStart;
-
-        // Insert the new intervals
-        tIn.emplace(inputStart + intervalDiff, outStart + intervalDiff);
-        tOut.emplace(outStart + intervalDiff, inputStart + intervalDiff);
-
-        // Remove the balanced interval from unbalanced
-        tUnbalanced.erase(inputStart);
-
-        // Check overlapping intervals for rebalancing
-        length_t outputsToCheck[] = {
-            tOut.lower_bound(inputStart + intervalDiff) != tOut.begin()
-                ? std::prev(tOut.lower_bound(inputStart + intervalDiff))->first
-                : numeric_limits<length_t>::max(),
-            outStart, outStart + intervalDiff};
-
-        for (length_t outputStart : outputsToCheck) {
-            auto endIt = tOut.upper_bound(outputStart);
-            length_t endInterval = (endIt != tOut.end())
-                                       ? endIt->first
-                                       : numeric_limits<length_t>::max();
-
-            // Count overlapping input intervals
-            length_t overlapCount = 1;
-            auto overlapInputIt = tIn.upper_bound(outputStart);
-            while (overlapInputIt != tIn.end() &&
-                   overlapInputIt->first < endInterval &&
-                   overlapCount <= maxOverlap) {
-                ++overlapCount;
-                ++overlapInputIt;
-            }
-
-            // Rebalance if needed
-            if (overlapCount > maxOverlap) {
-                tUnbalanced[tOut[outputStart]] = outputStart;
-            }
-        }
-    }
-
-    rows.initialize(tIn.size(), textLength);
-    length_t i = 0;
-    for (auto it = tIn.begin(); it != tIn.end(); ++it) {
-        rows.setRowValues(i, it->first, it->second, 0);
-        assert(rows.getInputStartPos(i) == it->first);
-        assert(rows.getOutputStartPos(i) == it->second);
-        i++;
-    }
-    length_t size = tIn.size();
-    rows.setRowValues(i, textLength, textLength, size);
-}
-
-void createUnbalancedMoveTable(MovePhiReprBP& rows,
-                               const map<length_t, length_t>& tIn,
-                               length_t textLength) {
-
-    rows.initialize(tIn.size(), textLength);
-    length_t i = 0;
-    for (auto it = tIn.begin(); it != tIn.end(); ++it) {
-        rows.setRowValues(i, it->first, it->second, 0);
-        assert(rows.getInputStartPos(i) == it->first);
-        assert(rows.getOutputStartPos(i) == it->second);
-        i++;
-    }
-    length_t size = tIn.size();
-    rows.setRowValues(i, textLength, textLength, size);
-}
-
-/**
- * Generate the mapping from start indices in both output intervals (phi and phi
- * inverse) to their corresponding run indices
- *
- * @param move Move structure
- * @param pred predecessor bitvector of the start samples
- * @param textLength length of the text
- */
-void generatePhiRunMapping(MovePhiReprBP& move, const SparseBitvec& pred,
-                           length_t textLength) {
-    for (length_t i = 0; i < move.size(); i++) {
-        length_t textPos = move.getOutputStartPos(i);
-        length_t runIndexInText = pred.rank(textPos);
-        move.setOutputStartRun(i, runIndexInText);
-        assert(move.getOutputStartRun(i) == runIndexInText);
-    }
 }
 
 #ifdef BIG_BWT_USABLE
@@ -1496,7 +1231,8 @@ void createTaggingData(const string& baseFN, const length_t& numberOfReferences,
                        const vector<length_t>& samplesLast,
                        const vector<length_t>& lastToRun,
                        const vector<length_t>& startPos,
-                       SparseBitvec& endOfBWTRun, const vector<int>& maxLFValues) {
+                       SparseBitvec& endOfBWTRun,
+                       const vector<int>& maxLFValues) {
     // Try to open the tagging files
     ifstream ifs(baseFN + ".reference.tags");
     if (ifs.is_open()) {
@@ -1546,6 +1282,8 @@ void createTaggingData(const string& baseFN, const length_t& numberOfReferences,
             length_t delta =
                 pred < currentPos ? currentPos - pred : currentPos + 1;
 
+            assert(predRank < lastToRun.size());
+
             // Ensure that phiInverse(SA[n-1]) is not called; the predecessor
             // rank must be valid.
             assert(lastToRun[predRank] < samplesFirst.size() - 1);
@@ -1566,7 +1304,7 @@ void createTaggingData(const string& baseFN, const length_t& numberOfReferences,
             //        referenceIdx < numberOfReferences);
             uint16_t nextTag = referenceTags[referenceIdx];
 
-            if(currentTag != nextTag){
+            if (currentTag != nextTag) {
                 tagRunEnd[i - 1] = true;
                 tagRunHeads.push_back(currentTag);
                 currentTag = nextTag;
@@ -1593,94 +1331,12 @@ void createTaggingData(const string& baseFN, const length_t& numberOfReferences,
         performSubSampling(maxLFValues, samplesLast, tagRunHeadsBWT, baseFN,
                            startPos);
 
-        logger.logInfo("Writing tagging data to files...");
-        tagRunEndBV.write(baseFN + ".tag.bv");
-        logger.logInfo("Wrote file " + baseFN + ".tag.bv");
-
-        writeIntVectorBinary(baseFN + ".tag.heads", tagRunHeads);
-        logger.logInfo("Wrote file " + baseFN + ".tag.heads");
-
         assert(tagRunHeadsBWT.size() == endOfBWTRun.rank(bwtSize));
 
-    } else{
+    } else {
         logger.logDeveloper(
             "No tagging data found. Skipping tagging data creation.");
     }
-}
-
-void writePhiMoveStructures(MovePhiReprBP& phiMove, const string& baseFN,
-                            const string& suffix, bool inverse,
-                            length_t bwtSize) {
-    // Generate and write predecessor bitvector
-    logger.logInfo("\tGenerating the predecessor bitvector...");
-    SparseBitvec pred;
-    generatePredecessors(phiMove, pred, bwtSize);
-
-    string predFileName =
-        baseFN + ".move." + suffix + "." + (inverse ? "prdl" : "prdf");
-    pred.write(predFileName);
-    logger.logInfo("\tWrote file " + predFileName);
-
-    // Generate and write phi run mapping
-    logger.logInfo("\tGenerating the mapping between output interval start "
-                   "positions and their run identifiers...");
-    generatePhiRunMapping(phiMove, pred, bwtSize);
-
-    string moveFileName = baseFN + ".phiBP." + suffix + (inverse ? ".inv" : "");
-    phiMove.write(moveFileName);
-    logger.logInfo("\tWrote file " + moveFileName);
-}
-
-void processPhiMoveStructures(const string& baseFN,
-                              map<length_t, length_t>& inputIntervals,
-                              map<length_t, length_t>& outputIntervals,
-                              bool inverse, length_t bwtSize,
-                              length_t maxOverlap = 4) {
-
-    { // Balanced move table
-        logger.logInfo("\tCollecting the unbalanced intervals...");
-        map<length_t, length_t> unbalancedIntervals;
-        fillTUnbalanced(unbalancedIntervals, inputIntervals, outputIntervals,
-                        maxOverlap);
-
-        logger.logInfo("\tBalancing the intervals...");
-        MovePhiReprBP phiMove;
-        balanceIntervals(unbalancedIntervals, phiMove, inputIntervals,
-                         outputIntervals, maxOverlap, bwtSize);
-        unbalancedIntervals.clear();
-
-        writePhiMoveStructures(phiMove, baseFN, "balanced", inverse, bwtSize);
-    }
-}
-
-void processPhiAndPhiInverse(const string& baseFN,
-                             vector<length_t>& samplesFirst,
-                             vector<length_t>& samplesLast, length_t bwtSize) {
-    // Initialize move structures for phi
-    map<length_t, length_t> inputIntervals;
-    map<length_t, length_t> outputIntervals;
-
-    logger.logInfo("Initiating the samples for the phi move structures...");
-    startBuildForPhiMove(inputIntervals, outputIntervals, samplesFirst,
-                         samplesLast);
-
-    samplesFirst.clear();
-    samplesLast.clear();
-
-    length_t maxOverlap = 4;
-
-    // Log creation of move table for phi
-    logger.logInfo("Creating the move table for phi...");
-    processPhiMoveStructures(baseFN, inputIntervals, outputIntervals, false,
-                             bwtSize, maxOverlap);
-
-    // Log creation of move table for phi inverse
-    logger.logInfo("Creating the move table for phi inverse...");
-    processPhiMoveStructures(baseFN, outputIntervals, inputIntervals, true,
-                             bwtSize, maxOverlap);
-
-    inputIntervals.clear();
-    outputIntervals.clear();
 }
 
 #ifdef BIG_BWT_USABLE
@@ -1730,39 +1386,25 @@ void processSamplesAndPreds(const string& baseFN,
                             const vector<length_t>& samplesLast,
                             const string& BWT, length_t numberOfReferences,
                             const vector<length_t>& startPos,
-                            SparseBitvec& endOfRun, const vector<int>& maxLFValues) {
-    vector<length_t> firstToRun;
+                            SparseBitvec& endOfRun,
+                            const vector<int>& maxLFValues) {
     vector<length_t> lastToRun;
 
     // Generate the predToRun arrays
     logger.logInfo(
         "Mapping the predecessor bits to their corresponding runs...");
-    generatePredToRun(samplesFirst, samplesLast, firstToRun, lastToRun,
-                      BWT.size());
+    generatePredToRun(samplesLast, lastToRun, BWT.size());
 
     SparseBitvec predFirst;
     SparseBitvec predLast;
 
-    logger.logInfo("Generating the predecessor bitvectors for the samples...");
-    generatePredecessors(samplesFirst, samplesLast, predFirst, predLast,
-                         BWT.size());
-
-    // Write predecessor structures
-    predFirst.write(baseFN + ".og.prdf");
-    logger.logInfo("Wrote file " + baseFN + ".og.prdf");
-    predLast.write(baseFN + ".og.prdl");
-    logger.logInfo("Wrote file " + baseFN + ".og.prdl");
-
-    writeIntVectorBinary(baseFN + ".ftr", firstToRun);
-    logger.logInfo("Wrote file " + baseFN + ".ftr");
-    writeIntVectorBinary(baseFN + ".ltr", lastToRun);
-    logger.logInfo("Wrote file " + baseFN + ".ltr");
+    logger.logInfo("Generating the predecessor bitvector for the samples...");
+    generatePredecessors(samplesLast, predLast, BWT.size());
 
     createTaggingData(baseFN, numberOfReferences, BWT.size(), predLast,
                       samplesFirst, samplesLast, lastToRun, startPos, endOfRun,
                       maxLFValues);
 
-    firstToRun.clear();
     lastToRun.clear();
 }
 
@@ -1788,12 +1430,6 @@ void createIndex(string& T, const BuildParameters& params,
         // Clear the suffix array
         SA.clear();
 
-        // write samplesFirst and samplesLast to file
-        writeIntVectorBinary(baseFN + ".smpf", samplesFirst);
-        logger.logInfo("Wrote file " + baseFN + ".smpf");
-        writeIntVectorBinary(baseFN + ".smpl", samplesLast);
-        logger.logInfo("Wrote file " + baseFN + ".smpl");
-
         SparseBitvec endOfRun;
 
         // Create the Move structure
@@ -1815,30 +1451,12 @@ void createIndex(string& T, const BuildParameters& params,
         string revBWT;
         createRevBWT(baseFN, T, revSA, sigma, revBWT);
 
-        // Create samplesLast and samplesFirst
-        logger.logInfo(
-            "Sampling the reverse suffix array values at run boundaries...");
-        vector<length_t> revSamplesFirst;
-        vector<length_t> revSamplesLast;
-        buildSamples(revSamplesFirst, revSamplesLast, revSA, revBWT);
-
-        // Clear the reverse suffix array
-        revSA.clear();
-
-        // write samplesFirst and samplesLast to file
-        writeIntVectorBinary(baseFN + ".rev.smpf", revSamplesFirst);
-        logger.logInfo("Wrote file " + baseFN + ".rev.smpf");
-        writeIntVectorBinary(baseFN + ".rev.smpl", revSamplesLast);
-        logger.logInfo("Wrote file " + baseFN + ".rev.smpl");
-
-        revSamplesFirst.clear();
-        revSamplesLast.clear();
-
         SparseBitvec endOfRun;
 
         // Create the Move structure
         logger.logInfo("Creating the reverse move table...");
-        createAndWriteMove(baseFN + ".rev", revBWT, charCounts, sigma, endOfRun);
+        createAndWriteMove(baseFN + ".rev", revBWT, charCounts, sigma,
+                           endOfRun);
 
         // Clear the reverse BWT
         revBWT.clear();
@@ -1846,7 +1464,8 @@ void createIndex(string& T, const BuildParameters& params,
 }
 
 void createIndexPFP(const string& baseFN, const length_t& numberOfReferences,
-                    const vector<length_t>& startPos, const vector<int>& maxLFValues) {
+                    const vector<length_t>& startPos,
+                    const vector<int>& maxLFValues) {
 
     // build the BWT
     string BWT;
@@ -1874,35 +1493,20 @@ void createIndexPFP(const string& baseFN, const length_t& numberOfReferences,
         SparseBitvec endOfRun;
 
         logger.logInfo("Creating the move table...");
-        length_t nrOfRuns = createAndWriteMove(baseFN, BWT, charCounts, sigma, endOfRun);
+        length_t nrOfRuns =
+            createAndWriteMove(baseFN, BWT, charCounts, sigma, endOfRun);
 
         BWT.clear();
-
-        bool makeToRun = true;
 
         vector<length_t> samplesFirst;
         vector<length_t> firstToRun;
         readSuffixArrayFile(baseFN, ".ssa", samplesFirst, firstToRun, bwtSize,
-                            nrOfRuns, false, true);
+                            nrOfRuns, false, false);
 
         vector<length_t> samplesLast;
         vector<length_t> lastToRun;
         readSuffixArrayFile(baseFN, ".esa", samplesLast, lastToRun, bwtSize,
-                            nrOfRuns, false, makeToRun);
-
-        // write samplesFirst and samplesLast to file
-        writeIntVectorBinary(baseFN + ".smpf", samplesFirst);
-        logger.logInfo("Wrote file " + baseFN + ".smpf");
-        writeIntVectorBinary(baseFN + ".smpl", samplesLast);
-        logger.logInfo("Wrote file " + baseFN + ".smpl");
-
-        // write firstToRun and lastToRun to file
-        writeIntVectorBinary(baseFN + ".ftr", firstToRun);
-        logger.logInfo("Wrote file " + baseFN + ".ftr");
-        writeIntVectorBinary(baseFN + ".ltr", lastToRun);
-        logger.logInfo("Wrote file " + baseFN + ".ltr");
-
-        lastToRun.clear();
+                            nrOfRuns, false, true);
 
         { // Original phi operation
             SparseBitvec predFirst;
@@ -1911,18 +1515,11 @@ void createIndexPFP(const string& baseFN, const length_t& numberOfReferences,
             // Generate the predecessor bitvectors
             logger.logInfo(
                 "Generating the predecessor bitvectors for the samples...");
-            generatePredecessors(samplesFirst, samplesLast, predFirst, predLast,
-                                 bwtSize);
+            generatePredecessors(samplesLast, predLast, bwtSize);
 
             createTaggingData(baseFN, numberOfReferences, bwtSize, predLast,
                               samplesFirst, samplesLast, lastToRun, startPos,
                               endOfRun, maxLFValues);
-
-            // Write predecessor structures
-            predFirst.write(baseFN + ".og.prdf");
-            logger.logInfo("Wrote file " + baseFN + ".og.prdf");
-            predLast.write(baseFN + ".og.prdl");
-            logger.logInfo("Wrote file " + baseFN + ".og.prdl");
 
             firstToRun.clear();
         }
@@ -1943,33 +1540,11 @@ void createIndexPFP(const string& baseFN, const length_t& numberOfReferences,
 
         // Create the Move structure
         logger.logInfo("Creating the move table...");
-        length_t nrOfRuns =
-            createAndWriteMove(baseFN + ".rev", revBWT, charCounts, sigma, endOfRun);
+        createAndWriteMove(baseFN + ".rev", revBWT, charCounts, sigma,
+                           endOfRun);
 
         // Clear the reverse BWT
         revBWT.clear();
-
-        vector<length_t> revSamplesFirst;
-        vector<length_t> revFirstToRun;
-        readSuffixArrayFile(baseFN, ".rev.ssa", revSamplesFirst, revFirstToRun,
-                            bwtSize, nrOfRuns, true, false);
-
-        revFirstToRun.clear();
-
-        vector<length_t> revSamplesLast;
-        vector<length_t> revLastToRun;
-        readSuffixArrayFile(baseFN, ".rev.esa", revSamplesLast, revLastToRun,
-                            bwtSize, nrOfRuns, true, false);
-        revLastToRun.clear();
-
-        // write samplesFirst and samplesLast to file
-        writeIntVectorBinary(baseFN + ".rev.smpf", revSamplesFirst);
-        logger.logInfo("Wrote file " + baseFN + ".rev.smpf");
-        writeIntVectorBinary(baseFN + ".rev.smpl", revSamplesLast);
-        logger.logInfo("Wrote file " + baseFN + ".rev.smpl");
-
-        revSamplesFirst.clear();
-        revSamplesLast.clear();
     }
 
     writeMetaInfo(baseFN);
@@ -1979,8 +1554,8 @@ int indexConstructingAfterPFP(const BuildParameters& params) {
     logger.logInfo(
         "Starting index construction after prefix-free parsing step...");
 
-    std::array<string, 6> requiredExtensionsPFP = {
-        ".bwt", ".esa", ".ssa", ".rev.bwt", ".rev.esa", ".rev.ssa"};
+    std::array<string, 4> requiredExtensionsPFP = {".bwt", ".esa", ".ssa",
+                                                   ".rev.bwt"};
 
     for (auto& ext : requiredExtensionsPFP) {
         string filename = params.baseFN + ext;
@@ -2069,11 +1644,11 @@ void processFastaFiles(const BuildParameters& params) {
     length_t numberOfReferences = preprocessFastaFiles(
         params.fastaFiles, params.baseFN, T, params.seedLength, noWriting,
         params.taggingCategories);
-        
+
     // read the start positions
     vector<length_t> startPos;
     ifstream ifs(params.baseFN + ".pos");
-    if(!ifs.is_open()){
+    if (!ifs.is_open()) {
         logger.logError("Could not open file " + params.baseFN + ".pos");
         throw runtime_error("Could not open file " + params.baseFN + ".pos");
     }

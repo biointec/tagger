@@ -27,9 +27,9 @@ enum OptionType {
     OUTPUT,
     BUILD_INPUT_FILE,
     BUILD_OUTPUT_FILE,
+    TAGGING_OPTION,
     ADVANCED,
     HELP,
-    TAGGING_OPTION,
 
     NUM_OPTION_TYPES // helper to get the number of option types
 };
@@ -58,7 +58,7 @@ inline std::string optionTypeToString(OptionType type) {
     case BUILD_OUTPUT_FILE:
         return "Index name";
     case TAGGING_OPTION:
-        return "Tagging";
+        return "Classification";
     default:
         return "Unknown type";
     }
