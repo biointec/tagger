@@ -226,10 +226,9 @@ void concatenateAndTransform(const std::string& fastaFile,
                 positions.emplace_back(
                     startPosition); // push back the start position of this
                                     // sequence
-                startPosition +=
-                    sequence
-                        .length(); // create start position for next sequence
-                sequence.clear();  // Clear the sequence for the next one
+                startPosition += sequence.length() +
+                                 1; // create start position for next sequence
+                sequence.clear();   // Clear the sequence for the next one
             }
             std::string description = line.substr(1);
             // get the sequence name (before the first space)

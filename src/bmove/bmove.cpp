@@ -112,9 +112,13 @@ void BMove::fromFiles(const string& baseFile, bool verbose
 length_t BMove::getTaggingSample(length_t start_pos, length_t start_run) const {
 #ifdef TAG_ARRAY_SUBSAMPLING
     size_t num_steps = 0;
+    bool not_last_index_in_run = false;
 
-    while (samplesTaggingBV[start_run] == 0) {
+    while (not_last_index_in_run || samplesTaggingBV[start_run] == 0) {
         move.findLF(start_pos, start_run);
+        assert(start_run < move.size());
+        not_last_index_in_run =
+            move.getInputStartPos(start_run + 1) - 1 != start_pos;
         num_steps++;
         assert(num_steps <= maxLFSteps);
     }
