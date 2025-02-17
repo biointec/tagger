@@ -226,7 +226,7 @@ std::unique_ptr<SearchStrategy> createSearchStrategy(const Parameters& params,
  */
 std::unique_ptr<Reader> createReader(const Parameters& params) {
     try {
-        auto reader = std::make_unique<Reader>(params.firstReadsFile, "");
+        auto reader = std::make_unique<Reader>(params.firstReadsFile);
         size_t targetChunk = 64 * 9;
         reader->startReaderThread(targetChunk, params.nThreads);
         return reader;
@@ -248,7 +248,7 @@ std::unique_ptr<OutputWriter> createOutputWriter(const Parameters& params) {
     try {
         auto writer = std::make_unique<OutputWriter>(
             params.outputFile, params.base + ".headerSN.bin", params.command,
-            SINGLE_END, params.reorder);
+            params.reorder);
         writer->start(params.nThreads * 500, params.nThreads);
         return writer;
     } catch (const std::exception& e) {

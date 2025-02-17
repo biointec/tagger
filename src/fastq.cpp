@@ -74,15 +74,6 @@ bool SequenceRecord::readFromFileFASTQ(SeqFile& inputFile) {
     return !read.empty();
 }
 
-void SequenceRecord::writeToFileFASTQ(SeqFile& inputFile) const {
-    inputFile.writeLine(seqID);
-    inputFile.writeChar('\n');
-    inputFile.writeLine(read);
-    inputFile.writeLine("\n+\n");
-    inputFile.writeLine(qual);
-    inputFile.writeChar('\n');
-}
-
 bool SequenceRecord::readFromFileFASTA(SeqFile& inputFile) {
     clear();
 
@@ -119,28 +110,14 @@ bool SequenceRecord::readFromFileFASTA(SeqFile& inputFile) {
     return !read.empty();
 }
 
-void SequenceRecord::writeToFileFASTA(SeqFile& inputFile) const {
-    inputFile.writeLine(seqID);
-    inputFile.writeChar('\n');
-    // write read in 80 character lines
-    const size_t lineLength = 80;
-    for (size_t i = 0; i < read.size(); i += lineLength) {
-        inputFile.writeLine(read.substr(i, lineLength));
-    }
-
-    inputFile.writeChar('\n');
-}
-
 // ============================================================================
 // READ BLOCK CLASS
 // ============================================================================
 
-void ReadBlock::getNextChunk(vector<ReadBundle>& buffer, bool pairedEnd) {
+void ReadBlock::getNextChunk(vector<ReadBundle>& buffer) {
 
     size_t remainingElements = this->size() - nextChunkOffset;
-    size_t bufferSize =
-        std::min(remainingElements,
-                 targetChunkSize + (pairedEnd && (targetChunkSize % 2 == 1)));
+    size_t bufferSize = std::min(remainingElements, targetChunkSize);
 
     buffer.resize(bufferSize);
     auto sourceStart = this->begin() + nextChunkOffset;
@@ -148,33 +125,6 @@ void ReadBlock::getNextChunk(vector<ReadBundle>& buffer, bool pairedEnd) {
     std::move(sourceStart, sourceEnd, buffer.begin());
 
     nextChunkOffset += bufferSize;
-}
-
-void ReadBlock::readFromFile(SeqFile& file1, SeqFile& file2,
-                             size_t targetBlockSize, bool fastq1, bool fastq2) {
-    // clear the block
-    this->clear();
-    nextChunkOffset = 0;
-
-    // read in new contents
-    SequenceRecord recordA(fastq1), recordB(fastq2);
-    size_t thisBlockSize = 0;
-
-    while (thisBlockSize < targetBlockSize) {
-        bool flag1 = recordA.readFromFile(file1);
-        bool flag2 = recordB.readFromFile(file2);
-        if (!flag1 || !flag2)
-            break;
-
-        this->push_back(recordA);
-        this->push_back(recordB);
-        thisBlockSize += 1;
-        thisBlockSize += 1;
-    }
-
-    if (file1.good() != file2.good())
-        logger.logWarning(
-            "paired-end FastQ files contain different  number of reads\n");
 }
 
 void ReadBlock::readFromFile(SeqFile& file, size_t targetBlockSize,
@@ -195,28 +145,12 @@ void ReadBlock::readFromFile(SeqFile& file, size_t targetBlockSize,
     }
 }
 
-void ReadBlock::writeToFile(SeqFile& file1, SeqFile& file2) {
-    // make sure we have an even number of read records
-    assert(this->size() % 2 == 0);
-
-    for (size_t i = 0; i < this->size(); i += 2) {
-        (*this)[i].writeToFile(file1);
-        (*this)[i + 1].writeToFile(file2);
-    }
-}
-
-void ReadBlock::writeToFile(SeqFile& file) {
-    for (const auto& r : *this)
-        r.writeToFile(file);
-}
-
 // ============================================================================
 // FASTQ READER
 // ============================================================================
 
-Reader::Reader(const string& filename1, const string& filename2)
-    : filename1(filename1), fileType1(UNKNOWN_FT), filename2(filename2),
-      fileType2(UNKNOWN_FT), pairedEnd(!filename2.empty()) {
+Reader::Reader(const string& filename1)
+    : filename1(filename1), fileType1(UNKNOWN_FT) {
     // try to figure out the file format based on the ext
     string ext;
 
@@ -232,33 +166,12 @@ Reader::Reader(const string& filename1, const string& filename2)
         throw runtime_error("cannot open file " + filename1);
 
     fastq1 = (fileType1 == FASTQ || fileType1 == FASTQ_GZ);
-
-    // no second file specified, assume single-ended reads
-    if (!pairedEnd)
-        return;
-
-    tie(fileType2, baseFilename2) = getFileType(filename2);
-    if (fileType2 == UNKNOWN_FT) {
-        string msg = "don't know how to open file: \"" + filename2 +
-                     "\"\nExpected one of the following extensions: "
-                     ".fastq or .fq (or .gz variants thereof)\n";
-        throw runtime_error(msg);
-    }
-
-    if (!Util::fileExists(filename2))
-        throw runtime_error("cannot open file " + filename2);
-
-    fastq2 = (fileType2 == FASTQ || fileType2 == FASTQ_GZ);
 }
 
 void Reader::readerThread() {
     // open the read file(s)
     SeqFile file1(fileType1 == FASTQ_GZ || fileType1 == FASTA_GZ);
     file1.open(filename1);
-
-    SeqFile file2(fileType2 == FASTQ_GZ || fileType2 == FASTA_GZ);
-    if (pairedEnd)
-        file2.open(filename2);
 
     // recheck the chunksize every 8 blocks to start
     size_t checkPoint = 8;
@@ -278,10 +191,7 @@ void Reader::readerThread() {
 
         // B) fill up the block (only this thread has access)
         // no mutexes are held by this thread at this point
-        if (pairedEnd)
-            block.readFromFile(file1, file2, targetBlockSize, fastq1, fastq2);
-        else
-            block.readFromFile(file1, targetBlockSize, fastq1);
+        block.readFromFile(file1, targetBlockSize, fastq1);
 
         // empty block: end-of-file reached
         if (block.empty())
@@ -336,8 +246,6 @@ void Reader::readerThread() {
     }
 
     file1.close();
-    if (pairedEnd)
-        file2.close();
 
     // send a termination message to the workers
     unique_lock<mutex> workLock(workMutex);
@@ -360,7 +268,7 @@ bool Reader::getNextChunk(vector<ReadBundle>& chunk, size_t& chunkID) {
     }
 
     // get a chunk of work (contents of chunk will be overwritten)
-    workBlocks.front().getNextChunk(chunk, pairedEnd);
+    workBlocks.front().getNextChunk(chunk);
     chunkID = this->chunkID++;
 
     // last chunk: move block from work queue back to the input queue
@@ -405,11 +313,10 @@ void Reader::joinReaderThread() {
 // ============================================================================
 
 OutputWriter::OutputWriter(const string& writeFile, const string& headerFile,
-                           const string& commandLineParameters,
-                           const SequencingMode& sequencingMode, bool reorder)
+                           const string& commandLineParameters, bool reorder)
     : writeFile(writeFile), fileType(UNKNOWN_FT), reorder(reorder),
       headerFile(headerFile), commandLineParameters(commandLineParameters),
-      sMode(sequencingMode), lastLogTime(chrono::steady_clock::now()),
+      lastLogTime(chrono::steady_clock::now()),
       startTime(chrono::steady_clock::now()) {
 
     // try to figure out the file format based on the ext
@@ -475,10 +382,6 @@ void OutputWriter::logProcess(length_t processedRecords, bool alwaysLog) {
     auto timeElapsedSinceLastLog =
         chrono::duration_cast<chrono::seconds>(now - lastLogTime);
 
-    string readsOrPairs = (sMode == SINGLE_END) ? "reads" : "read pairs";
-    string recordsOrPairs =
-        (sMode == SINGLE_END) ? "read records" : "read pairs";
-
     if (alwaysLog || (timeElapsedSinceLastLog >= minimumLogSeconds &&
                       (processedRecords % logIntervalRecords == 0 ||
                        timeElapsedSinceLastLog >= logIntervalSeconds))) {
@@ -491,9 +394,9 @@ void OutputWriter::logProcess(length_t processedRecords, bool alwaysLog) {
         double rate = (processedRecords / static_cast<double>(timeElapsed));
 
         stringstream ss;
-        ss << "Processed " << processedRecords << " " << recordsOrPairs
+        ss << "Processed " << processedRecords << " read records"
            << ". Rate: " << fixed << setprecision(0) << rate * 1000 << " "
-           << readsOrPairs << "/second";
+           << "reads/second";
 
         logger.logInfo(ss);
         lastLogTime = now;
@@ -547,63 +450,18 @@ void OutputWriter::writerThread() {
         // no thread is held at this point
         for (const OutputRecord& record : chunk.getRecords()) {
 
-            if (sMode == SINGLE_END) {
-                counters.inc(Counters::NUMBER_OF_READS);
+            counters.inc(Counters::NUMBER_OF_READS);
 
-                bool mapped = !record.outputOcc->empty() &&
-                              record.outputOcc->front().isValid();
-                counters.inc(Counters::MAPPED_READS, mapped);
+            bool mapped = !record.outputOcc->empty() &&
+                          record.outputOcc->front().isValid();
+            counters.inc(Counters::MAPPED_READS, mapped);
 
-                counters.inc(Counters::TOTAL_UNIQUE_MATCHES,
-                             (mapped) ? record.outputOcc->size() : 0);
+            counters.inc(Counters::TOTAL_UNIQUE_MATCHES,
+                         (mapped) ? record.outputOcc->size() : 0);
 
-                // write the occurrences  to file
-                for (const auto& match : *record.outputOcc) {
-                    writeSeq.writeLine(match.getOutputLine());
-                }
-
-            } else {
-                counters.inc(Counters::NUMBER_OF_READS, 2); // two read per pair
-
-                const auto& pairedOccs = record.pairOcc;
-                const auto& unpairedOccs = record.unpairedOcc;
-
-                bool mapped = !pairedOccs->empty() &&
-                              pairedOccs->front().getUpStream().isValid() &&
-                              pairedOccs->front().getDownStream().isValid();
-                bool discordantlyMapped =
-                    mapped && pairedOccs->front().isDiscordant();
-                bool mappedHalf =
-                    !(mapped) &&
-                    (!pairedOccs->empty() &&
-                     (pairedOccs->front().getUpStream().isValid() ||
-                      pairedOccs->front().getDownStream().isValid()));
-                bool unpairedButMapped = !unpairedOccs->empty();
-
-                counters.inc(Counters::TOTAL_UNIQUE_PAIRS,
-                             (mapped) ? pairedOccs->size() : 0);
-
-                counters.inc(Counters::MAPPED_PAIRS, mapped);
-                counters.inc(Counters::DISCORDANTLY_MAPPED_PAIRS,
-                             discordantlyMapped);
-                counters.inc(Counters::MAPPED_HALF_PAIRS, mappedHalf);
-                counters.inc(Counters::UNPAIRED_BUT_MAPPED_PAIRS,
-                             unpairedButMapped);
-
-                // write the pairs to file
-                bool firstWrite = true;
-                for (const auto& pair : *pairedOccs) {
-                    writeSeq.writeLine(pair.getUpStream().getOutputLine());
-                    if (!mappedHalf || firstWrite) {
-                        writeSeq.writeLine(
-                            pair.getDownStream().getOutputLine());
-                    }
-                    firstWrite = false;
-                }
-                // then write unpaired occurrences to file
-                for (const auto& match : *unpairedOccs) {
-                    writeSeq.writeLine(match.getOutputLine());
-                }
+            // write the occurrences  to file
+            for (const auto& match : *record.outputOcc) {
+                writeSeq.writeLine(match.getOutputLine());
             }
 
             logProcess(++processedRecords);
@@ -618,7 +476,7 @@ void OutputWriter::writerThread() {
     // add dropped unique matches
     counters.inc(Counters::TOTAL_UNIQUE_MATCHES,
                  counters.get(Counters::DROPPED_UNIQUE_MATCHES));
-    counters.reportStatistics(sMode);
+    counters.reportStatistics();
 }
 
 void OutputWriter::sendTermination(size_t chunkID) {

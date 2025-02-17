@@ -85,12 +85,6 @@ std::ostream& operator<<(std::ostream& out, const FileType& fileType) {
     case FASTA_GZ:
         out << "fasta.gz";
         break;
-    case RHS:
-        out << "rhs";
-        break;
-    case RHS_GZ:
-        out << "rhs.gz";
-        break;
     case OUT:
         out << "out";
         break;

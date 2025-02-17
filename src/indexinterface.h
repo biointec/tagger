@@ -23,7 +23,7 @@
 #define INDEXINTERFACE_H
 
 #include "alphabet.h"
-#include "definitions.h"       // for length_t, PairStatus, Strand
+#include "definitions.h"       // for length_t, Strand
 #include "indexhelpers.h"      // for SARangePair, Range, TextOcc
 #include "reads.h"             // for ReadBundle
 #include "substring.h"         // for Substring
@@ -39,7 +39,6 @@
 #include <vector>                   // for vector
 
 class MemoryMappedTextFile;
-class Search;
 
 class IndexInterface;
 typedef bool (IndexInterface::*ExtraCharPtr)(length_t, const SARangePair&,
@@ -293,7 +292,9 @@ class IndexInterface {
                     std::unordered_map<uint16_t, int64_t>& lastSeenPositions,
                     length_t& totalWeight) const = 0;
 
+#ifdef GROUND_TRUTH_CHECKS
     virtual uint16_t getCorrectTag(const std::string& refID) const = 0;
+#endif
 };
 
 #endif

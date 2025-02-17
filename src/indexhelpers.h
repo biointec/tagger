@@ -22,7 +22,7 @@
 #ifndef INDEX_HELPERS_H
 #define INDEX_HELPERS_H
 
-#include "definitions.h" // for length_t, PairStatus, Strand, FIRST_IN...
+#include "definitions.h" // for length_t, Strand, FIRST_IN...
 #include "reads.h"       // for ReadBundle
 
 #include <algorithm>          // for max, copy, sort, unique
@@ -274,7 +274,7 @@ typedef MoveRange SARange; // the range in the suffix array in the move table
 /**
  * An occurrence in the text. An occurrence is a range in the text and a
  * distance to the mapped read. The distance can be either an edit distance or
- * a hamming distance. The occurrence can also contain a CIGAR string, an
+ * a hamming distance. The occurrence can also contain an
  * assigned sequence, a line in SAM format and a flag representing whether this
  * occurrence is along the forward or reverse complemented strand.
  */
@@ -283,17 +283,12 @@ class TextOcc {
     Range range;       // the range in the text
     length_t distance; // the distance to this range (edit or hamming)
 
-    std::string stringCIGAR = "*"; // Set to *
-
     length_t assignedSequenceID = -1; // the ID of the assigned sequence
 
     bool seqNameChecked = false; // indicates whether the sequence name was
     // found for this occurrence
-    SeqNameFound seqNameFound = NOT_FOUND; // indicates whether
 
     Strand strand = FORWARD_STRAND; // the strand on which this occurrence lies
-    PairStatus pairStatus = FIRST_IN_PAIR; // indicates whether this occurrence
-    // is the first read in a pair
 
     std::string outputLine = ""; // the output line for this text Occ
 
@@ -317,58 +312,6 @@ class TextOcc {
         return result;
     }
 
-    /**
-     * Get the flags for the SAM line of this occurrence (paired-end).
-     * @param mateOcc The mate occurrence.
-     * @param discordant Indicates whether the pair is discordant.
-     * @param primaryAlignment Indicates whether this is the primary alignment
-     * @returns the flags for the SAM line of this occurrence.
-     */
-    uint16_t getFlagsPE(const TextOcc& mateOcc, bool discordant,
-                        bool primaryAlignment) const {
-        uint16_t result = 0;
-
-        // set paired flag
-        result |= 1;
-        // set proper pair flag
-        uint16_t mateOccMapped = mateOcc.isValid();
-        uint16_t mapped = isValid();
-        result |= (!discordant && mateOccMapped && mapped) << 1;
-
-        // set unmapped flag
-        result |= (!mapped << 2); // 4
-        // set mate unmapped flag
-        result |= (!mateOccMapped << 3); // 8
-
-        // set rev complement flag
-        result |= (isRevCompl() << 4); // 16
-        // set mate rev complement flag
-        result |= (mateOcc.isRevCompl() << 5); // 32
-        // set first read in pair flag
-        result |= (isFirstReadInPair() << 6); // 64
-        // set mate first read in pair flag
-        result |= (mateOcc.isFirstReadInPair() << 7); // 128
-        // set secondary flag
-        result |= (!primaryAlignment << 8); // 256
-
-        // 512 to 2048 are not set currently
-
-        return result;
-    }
-
-    /**
-     * Gets the string that represents this occurrence in the XA tag of the SAM
-     * format. XA tag format: rname,pos,CIGAR,NM; The sign of pos indicates the
-     * strand
-     * @param seqNames the vector with all sequence names
-     */
-    std::string asXA(const std::vector<std::string>& seqNames) const {
-        char sign = (isRevCompl()) ? '-' : '+';
-        return fmt::format("{},{}{},{},{};", seqNames[assignedSequenceID], sign,
-                           range.getBegin() + 1, // SAM is 1-based
-                           stringCIGAR, distance);
-    }
-
   public:
     /**
      * Constructor
@@ -376,171 +319,16 @@ class TextOcc {
      * @param distance The (edit or hamming) distance to the mapped read of
      * this occurrence.
      * @param strand The strand on which this occurrence lies.
-     * @param pairStatus Indicates whether this occurrence is the first or
-     * second read in the pair.
      */
-    TextOcc(Range range, length_t distance, Strand strand,
-            PairStatus pairStatus)
+    TextOcc(Range range, length_t distance, Strand strand)
         : range(range), distance(distance), strand(strand),
-          pairStatus(pairStatus), indexBegin(range.getBegin()) {
-    }
-
-    /**
-     * Constructor
-     * @param range The range of this occurrence in the text.
-     * @param distance The (edit or hamming) distance to the mapped read of
-     * this occurrence.
-     * @param CIGAR The CIGAR string of this occurrence.
-     * @param strand The strand on which this occurrence lies.
-     * @param pairStatus Indicates whether this occurrence is the first or
-     * second read in the pair.
-     */
-    TextOcc(Range range, length_t distance, const std::string& CIGAR,
-            Strand strand, PairStatus pairStatus)
-        : range(range), distance(distance), stringCIGAR(CIGAR), strand(strand),
-          pairStatus(pairStatus), indexBegin(range.getBegin()) {
-        assert(CIGAR == "*"); // CIGAR must be * under RLC
+          indexBegin(range.getBegin()) {
     }
 
     /**
      * Constructor for an invalid text occurrence
      */
     TextOcc() : range(0, 0) {
-    }
-
-    /**
-     * Creates an unmapped RHS record for single-end alignment. The hits column
-     *contains an asterisk.
-     * @param bundle The read bundle with info about this sequence
-     * @returns the unmapped occurrence.
-     */
-    static TextOcc createUnmappedRHSOccurrenceSE(const ReadBundle& bundle) {
-        TextOcc t; // default constructor
-        t.outputLine = bundle.getSeqID() + "\t*";
-        return t;
-    }
-
-    /**
-     * Creates an unmapped occurrence with SAM line for paired-end alignment
-     * @param bundle The read bundle with info about this sequence
-     * @param pairStatus Indicates whether this occurrence is the first or
-     * second read in the pair
-     * @param mateMapped Indicates whether the mate is mapped. [default: false]
-     * @param mateStrand The strand of the mate. [default: FORWARD_STRAND]
-     * @returns the unmapped occurrence.
-     */
-     
-    void generateSAMSingleEnd(const std::string& seqID,
-                              const std::string& printSeq,
-                              const std::string& printQual, length_t nHits,
-                              length_t minScore, bool primaryAlignment,
-                              const std::vector<std::string>& seqNames,
-                              std::string tag = "");
-
-    /**
-     * Generates the SAM line for this occurrence and put the other occurrences
-     * in the XA tag.
-     * @param seqID The sequence ID of the read.
-     * @param printSeq The sequence of the read (or reverse complement) to be
-     * printed
-     * @param printQual The base quality to be printed
-     * @param nHits The number of matches with the best score (includes this
-     * occurrence!)
-     * @param otherMatches The other matches.
-     * @param seqNames the vector with all the reference sequence names
-     */
-    void generateSAMSingleEndXA(const std::string& seqID,
-                                const std::string& printSeq,
-                                const std::string& printQual, length_t nHits,
-                                const std::vector<TextOcc>& otherMatches,
-                                const std::vector<std::string>& seqNames);
-
-    /**
-     * Generates the SAM line for this occurrence. Given that this is the
-     * first occurrence.
-     * @param bundle the read bundle with info about this sequence
-     * @param nHits The number of other matches.
-     * @param minScore The score of the best match.
-     * @param seqNames the vector with all the reference sequence names
-     */
-    void generateSAMSingleEndFirst(ReadBundle& bundle, length_t nHits,
-                                   length_t minScore,
-                                   const std::vector<std::string>& seqNames,
-                                   std::string tag = "") {
-
-        std::string printSeq =
-            (isRevCompl()) ? bundle.getRevComp() : bundle.getRead();
-        std::string printQual =
-            (isRevCompl()) ? bundle.getRevQuality() : bundle.getQual();
-
-        generateSAMSingleEnd(bundle.getSeqID(), printSeq, printQual, nHits,
-                             minScore, true, seqNames, tag);
-    }
-
-    /**
-     * Generates the SAM line for this occurrence, given that this is the
-     * first occurrence. The other alignments are put in the XA tag.
-     * @param bundle the read bundle with info about this sequence
-     * @param nHits The number of  matches with an equal score (this included!)
-     * @param minScore The score of the best match.
-     * @param otherMatches The other matches.
-     * @param seqNames
-     */
-    void generateSAMSingleEndXA(ReadBundle& bundle, length_t nHits,
-                                length_t minScore,
-                                const std::vector<TextOcc>& otherMatches,
-                                const std::vector<std::string>& seqNames) {
-
-        std::string printSeq =
-            (isRevCompl()) ? bundle.getRevComp() : bundle.getRead();
-        std::string printQual =
-            (isRevCompl()) ? bundle.getRevQuality() : bundle.getQual();
-
-        if (printQual.empty()) {
-            printQual = "*";
-        }
-        generateSAMSingleEndXA(bundle.getSeqID(), printSeq, printQual, nHits,
-                               otherMatches, seqNames);
-    }
-
-    /**
-     * Generates the SAM line for this occurrence. Given that this is not the
-     * first occurrence.
-     * @param seqID The sequence ID of the read.
-     * @param nHits The number of other matches.
-     * @param minScore The score of the best match.
-     * @param seqNames the vector with all the reference sequence names
-     */
-    void generateSAMSingleEndNotFirst(const std::string& seqID, length_t nHits,
-                                      length_t minScore,
-                                      const std::vector<std::string>& seqNames,
-                                      std::string tag = "") {
-
-        // print * for sequence and quality
-        generateSAMSingleEnd(seqID, "*", "*", nHits, minScore, false, seqNames,
-                             tag);
-    }
-
-    /**
-     * Generates the SAM line for this occurrence, given that this is the
-     * first occurrence. The other alignments are put in the XA tag.
-     * @param bundle the read bundle with info about this sequence
-     * @param otherMatches The other matches.
-     * @param seqNames the vector with all the reference sequence names
-     */
-    void generateRHSSingleEnd(ReadBundle& bundle,
-                              const std::vector<TextOcc>& otherMatches,
-                              const std::vector<std::string>& seqNames) {
-        outputLine = bundle.getSeqID();
-        outputLine += "\t" + getRHS(seqNames);
-        for (const auto& other : otherMatches) {
-            outputLine += ";" + other.getRHS(seqNames);
-        }
-    }
-
-    std::string getRHS(const std::vector<std::string>& seqNames) const {
-        return "(" + seqNames[assignedSequenceID] + "," +
-               fmt::to_string(distance) + ")";
     }
 
     /**
@@ -572,10 +360,6 @@ class TextOcc {
         this->distance = distance;
     }
 
-    void setPairStatus(PairStatus pairStatus) {
-        this->pairStatus = pairStatus;
-    }
-
     /**
      * @returns the output line of this occurrence
      */
@@ -592,14 +376,10 @@ class TextOcc {
         return assignedSequenceID;
     }
 
-    const bool hasAssignedSequence() const {
-        return seqNameChecked && seqNameFound != NOT_FOUND;
-    }
-
     /**
      * Operator overloading for sorting the occurrences.
      * Occurrences are first sorted on their begin position, then on their
-     * distance , their length and finally on the existence of the CIGAR string
+     * distance and their length
      * @param r the occurrence to compare to this (=right hand side of the
      * comparison)
      */
@@ -660,56 +440,6 @@ class TextOcc {
         return strand == REVERSE_C_STRAND;
     }
 
-    bool isFirstReadInPair() const {
-        return pairStatus == FIRST_IN_PAIR;
-    }
-
-    /**
-     * Sets the CIGAR string of this occurrence.
-     * @param cigar the CIGAR string to set
-     */
-    void setCigar(std::string& cigar) {
-        // function does nothing in case of run length compression
-    }
-
-    /**
-     * @returns the CIGAR string of this occurrence.
-     */
-    std::string& getCigar() {
-        assert(stringCIGAR == "*");
-        return stringCIGAR;
-    }
-
-    /**
-     * Sets the sequence to which this occurrence belongs.
-     */
-    void setAssignedSequence(SeqNameFound snFound, length_t seqID) {
-
-        assignedSequenceID = seqID;
-        seqNameChecked = true;
-        seqNameFound = snFound;
-    }
-
-    void setAssignedSequenceNotFound() {
-
-        assignedSequenceID = -1;
-        seqNameChecked = true;
-        seqNameFound = NOT_FOUND;
-    }
-
-    void removeTrimmingLabel() {
-        assert(seqNameFound == FOUND_WITH_TRIMMING);
-        seqNameFound = FOUND;
-    }
-
-    SeqNameFound getSeqNameFound() const {
-        return seqNameFound;
-    }
-
-    const bool isSeqNameChecked() const {
-        return seqNameChecked;
-    }
-
     const length_t getEnd() const {
         return range.getEnd();
     }
@@ -717,16 +447,8 @@ class TextOcc {
         return range.getBegin();
     }
 
-    const PairStatus getPairStatus() const {
-        return pairStatus;
-    }
     const Strand getStrand() const {
         return strand;
-    }
-
-    void dropFields() {
-        // we no longer need most fields so we can drop those we do not need
-        stringCIGAR.clear();
     }
 
     void setIndexBegin(length_t indexBegin) {
@@ -739,87 +461,6 @@ class TextOcc {
 
     const length_t getIndexEnd() const {
         return indexBegin + range.width();
-    }
-};
-
-/**
- * Struct PairedTextOccs that stores two TextOccs and the fragment size, as well
- as if the pair is discordant.
-
-*/
-class PairedTextOccs { //todolore
-  private:
-    TextOcc upStreamOcc;   // the upstream occurrence
-    TextOcc downStreamOcc; // the downstream occurrence
-
-    uint32_t fragSize; // the fragment size
-    uint32_t distance; // the distance of the pair to the reference
-
-    bool discordant = false; // indicates whether the pair is discordant
-  public:
-    /**
-     * @returns the total distance of the pair to the reference
-     */
-    uint32_t getDistance() const {
-        return distance;
-    }
-
-    /**
-     * Operator overloading. A PairedTextOccs is smaller than a value if its
-     * total distance to the reference is smaller than the value.
-     */
-    bool operator<(uint32_t value) {
-        return getDistance() < value;
-    }
-
-    void setDiscordant() {
-        discordant = true;
-    }
-
-    bool isDiscordant() const {
-        return discordant;
-    }
-
-    PairedTextOccs(TextOcc upStreamOcc, TextOcc downStreamOcc)
-        : upStreamOcc(upStreamOcc), downStreamOcc(downStreamOcc),
-          fragSize(downStreamOcc.getRange().getEnd() -
-                   upStreamOcc.getRange().getBegin()),
-          distance(upStreamOcc.getDistance() + downStreamOcc.getDistance()) {
-    }
-
-    PairedTextOccs(TextOcc upStreamOcc, TextOcc downStreamOcc,
-                   uint32_t fragSize)
-        : upStreamOcc(upStreamOcc), downStreamOcc(downStreamOcc),
-          fragSize(fragSize),
-          distance(upStreamOcc.getDistance() + downStreamOcc.getDistance()) {
-    }
-
-    /**
-     * @returns the upstream occurrence
-     */
-    TextOcc& getUpStream() {
-        return upStreamOcc;
-    }
-    /**
-     * @returns the downstream occurrence
-     */
-    TextOcc& getDownStream() {
-        return downStreamOcc;
-    }
-
-    const TextOcc& getUpStream() const {
-        return upStreamOcc;
-    }
-
-    const TextOcc& getDownStream() const {
-        return downStreamOcc;
-    }
-
-    /**
-     * @returns the fragment size
-     */
-    uint32_t getFragSize() const {
-        return fragSize;
     }
 };
 
@@ -1094,11 +735,6 @@ class FMOcc {
     length_t distance; // the distance (hamming or edit)
     length_t shift; // A right-sift to the corresponding positions in the text
 
-    Strand strand = FORWARD_STRAND; // indicates whether this occurrence is
-                                    // reverse complemented
-    PairStatus pairStatus = FIRST_IN_PAIR; // indicates whether this occurrence
-                                           // is the first read in a pair
-
   public:
     FMOcc() : pos(), distance(0), shift(0) {
     }
@@ -1109,34 +745,23 @@ class FMOcc {
      * @param distance the (edit or hamming) distance of this approximate
      * match
      * @param depth the depth (=length) of this approximate match
-     * @param strand the strand on which this occurrence lies, defaults to
-     * FORWARD_STRAND
-     * @param pairStatus indicates whether this occurrence is the first or
-     * second in the pair, defaults to FIRST_IN_PAIR
      * @param shift The right shift to the corresponding positions in the
      * text, defaults to zero
      */
     FMOcc(SARangePair ranges, length_t distance, length_t depth,
-          Strand strand = FORWARD_STRAND, PairStatus pairStatus = FIRST_IN_PAIR,
           length_t shift = 0)
-        : pos(ranges, depth), distance(distance), shift(shift), strand(strand),
-          pairStatus(pairStatus) {
+        : pos(ranges, depth), distance(distance), shift(shift) {
     }
     /**
      * Make a bidirectional approximate match in the suffix array
      * @param pos the position in the FMIndex of this approximate match
      * @param distance the (edit or hamming) distance of this approximate
      * match
-     * @param strand the strand on which this occurrence lies
-     * @param pairStatus indicates whether this occurrence is the first or
-     * second in the pair
      * @param shift The right shift to the corresponding positions in the
      * text, defaults to zero
      */
-    FMOcc(FMPos pos, length_t distance, Strand strand, PairStatus pairStatus,
-          length_t shift = 0)
-        : pos(pos), distance(distance), shift(shift), strand(strand),
-          pairStatus(pairStatus) {
+    FMOcc(FMPos pos, length_t distance, length_t shift = 0)
+        : pos(pos), distance(distance), shift(shift) {
     }
 
     const SARangePair& getRanges() const {
@@ -1170,14 +795,6 @@ class FMOcc {
         pos.setDepth(depth);
     }
 
-    void setStrand(Strand strand) {
-        this->strand = strand;
-    }
-
-    void setPairStatus(PairStatus pairStatus) {
-        this->pairStatus = pairStatus;
-    }
-
     /**
      * @returns true if the position is valid, false otherwise
      */
@@ -1185,20 +802,6 @@ class FMOcc {
         return pos.isValid();
     }
 
-    bool isRevCompl() const {
-        return strand == REVERSE_C_STRAND;
-    }
-
-    bool isFirstReadInPair() const {
-        return pairStatus == FIRST_IN_PAIR;
-    }
-
-    Strand getStrand() const {
-        return strand;
-    }
-    PairStatus getPairStatus() const {
-        return pairStatus;
-    }
     /**
      * Operator overloading to sort FMOcc
      * First the FMOcc are sorted on the begin of the range over the suffix
@@ -1233,7 +836,7 @@ class FMOcc {
     bool operator==(const FMOcc& rhs) const {
         return getRanges() == rhs.getRanges() &&
                distance == rhs.getDistance() && getDepth() == rhs.getDepth() &&
-               getShift() == rhs.getShift() && isRevCompl() == rhs.isRevCompl();
+               getShift() == rhs.getShift();
     }
     friend std::ostream& operator<<(std::ostream& os, const FMOcc& fmOcc);
 };
@@ -1287,12 +890,7 @@ class FMPosExt : public FMPos {
     void report(FMOcc& occ, const length_t& startDepth, const length_t& EDFound,
                 const bool& noDoubleReports = false, length_t shift = 0) {
         if (!reported) {
-            Strand strand =
-                FORWARD_STRAND; // strand does not matter here-> just choose
-            PairStatus pairStatus =
-                FIRST_IN_PAIR; // pairStatus does not matter here
-            occ = FMOcc(getRanges(), EDFound, depth + startDepth, strand,
-                        pairStatus, shift);
+            occ = FMOcc(getRanges(), EDFound, depth + startDepth, shift);
 
             // if finalPiece, report only once
             if (noDoubleReports) {
@@ -1327,139 +925,6 @@ class FMPosExt : public FMPos {
 };
 
 // ============================================================================
-// CLASS CLUSTER
-// ============================================================================
-
-/**
- * Cluster class to represent the end of an alignment phase in the bidirectional
- * index using a search scheme. The cluster contains the final column of the
- * alignment matrix with the corresponding distance scores and nodes in the
- * index. The cluster can report the centers of the cluster and the deepest
- * local minimum for efficient switching to a the next phase in the search
- * scheme.
- */
-class Cluster {
-  private:
-    std::vector<uint16_t> eds;   // the edit distances of this cluster
-    std::vector<FMPosExt> nodes; // the nodes of this cluster
-
-    length_t lastCell;   // the lastCell of the cluster that was filled in
-    uint16_t maxED;      // the maxEd for this cluster
-    length_t startDepth; // the startDepth for this cluster (= depth of match
-                         // before matrix of this cluster)
-
-    length_t shift; // the right shift of the occurrences in the text
-  public:
-    /**
-     * Constructor
-     * @param size the size of the cluster
-     * @param maxED the maximal allowed edit distance
-     * @param startDepth the depth before this cluster
-     * @param shift the right shift of the occurrences in the text
-     */
-    Cluster(length_t size, length_t maxED, length_t startDepth, length_t shift)
-        : eds(size, maxED + 1), nodes(size), lastCell(-1), maxED(maxED),
-          startDepth(startDepth), shift(shift) {
-    }
-
-    /**
-     * Sets the ed and node at index idx to ed and node. Also updates
-     * lastCell to be idx
-     * @param idx the idx to change
-     * @param node the node to set at index idx
-     * @param ed the ed to set at index idx
-     */
-    void setValue(length_t idx, const FMPosExt& node, const length_t& ed) {
-        eds[idx] = ed;
-        nodes[idx] = node;
-        lastCell = idx;
-    }
-
-    /**
-     * Returns the size of this cluster
-     */
-    const length_t size() const {
-        return eds.size();
-    }
-
-    /**
-     * @returns vector with all nodes in the cluster that are a centre and
-     * under the maximal allowed distance, be aware that if there are
-     * multiple centers in the cluster it is very likely that only one of
-     * them will be redundant, but the others might eliminate another
-     * occurrence
-     */
-    std::vector<FMOcc> reportCentersAtEnd() {
-
-        std::vector<FMOcc> centers;
-        centers.reserve(lastCell + 1);
-
-        for (length_t i = 0; i <= lastCell; i++) {
-            if (eds[i] <= maxED && (i == 0 || eds[i] <= eds[i - 1]) &&
-                (i == lastCell || eds[i] <= eds[i + 1])) {
-                FMOcc m;
-                nodes[i].report(m, startDepth, eds[i], true, shift);
-                centers.emplace_back(m);
-            }
-        }
-
-        return centers;
-    }
-
-    /**
-     * @returns approximate match that corresponds to the ranges of the
-     * deepest global minimum of this cluster, but with the depth of the
-     * highest global minimum of this cluster. If the direction is backward
-     * a shift will be set such that the occurrence in the text will be as
-     * short as possible
-     */
-    FMOcc reportDeepestMinimum(Direction dir) {
-        uint16_t minED = maxED + 1;
-        length_t highestBestIdx = -1;
-        length_t deepestBestIdx = -1;
-
-        for (length_t i = 0; i <= lastCell; i++) {
-            if (eds[i] < minED) {
-                minED = eds[i];
-                highestBestIdx = i;
-                deepestBestIdx = i;
-            }
-            if (eds[i] == minED) {
-                deepestBestIdx = i;
-            }
-        }
-        FMOcc m;
-        if (minED <= maxED) {
-            nodes[deepestBestIdx].report(
-                m, startDepth - (deepestBestIdx - highestBestIdx), minED, true,
-                ((dir == BACKWARD) ? (deepestBestIdx - highestBestIdx) : 0) +
-                    shift);
-        }
-        return m;
-    }
-
-    /**
-     * This method returns a match that corresponds to the highest cluster
-     * centre. Its descendants and the corresponding initialization edit
-     * distances are updated. Eds of descendants that are part of a cluster
-     * centre which is lower than the lower bound will be updated in the initEds
-     * vector
-     * @param lowerBound the lower bound for this iteration
-     * @param desc the descendants of the highest cluster centre, these
-     * will be inserted during the method
-     * @param initEds the initialization eds for the next iteration, these
-     * correspond to the eds of the highest centre and its descendants,
-     * where eds part of a cluster of which the centre is below the
-     * lower bound are updated. These values will be inserted during the
-     * method
-     * @returns The occurrence corresponding to the upper cluster centre
-     * which has a valid distance
-     */
-    FMOcc getClusterCentra(uint16_t lowerBound, std::vector<FMPosExt>& desc,
-                           std::vector<uint16_t>& initEds);
-};
-
-// ============================================================================
 // CLASS COUNTERS
 // ============================================================================
 /**
@@ -1480,12 +945,6 @@ class Counters {
         NUMBER_OF_READS,           // counts the number of reads
         TOTAL_UNIQUE_MATCHES,      // counts the number of all unique matches
         MAPPED_READS,              // counts the number of mapped reads
-        TOTAL_UNIQUE_PAIRS,        // number of unique paired-matches
-        MAPPED_PAIRS,              // number of mapped pairs
-        DISCORDANTLY_MAPPED_PAIRS, // number of discordantly mapped pairs
-        MAPPED_HALF_PAIRS, // number of pairs for which only one read mapped
-        UNPAIRED_BUT_MAPPED_PAIRS, // number of pairs for which both reads map
-                                   // but pairing was not possible
 
         TOTAL_STEP_COUNTS,                  // counts the total number of steps in the tagging process
         TOTAL_READ_LENGTHS,                 // counts the total lengths of reads processed
@@ -1556,10 +1015,8 @@ class Counters {
     /**
      * @brief Reports statistics based on the counters and a given sequencing
      * mode.
-     *
-     * @param sMode The sequencing mode to use for reporting statistics.
      */
-    void reportStatistics(const SequencingMode& sMode) const;
+    void reportStatistics() const;
 };
 
 // ============================================================================
@@ -1602,69 +1059,12 @@ class Occurrences {
     }
 
     /**
-     * @brief Adds an in-index occurrence to the collection.
-     *
-     * @param ranges The SA ranges of the occurrence.
-     * @param score The score of the occurrence.
-     * @param depth The depth of the occurrence.
-     * @param strand The strand of the occurrence.
-     * @param pairStatus The pair status of the read.
-     */
-    void addFMOcc(const SARangePair& ranges, const length_t& score,
-                  const length_t& depth, const Strand strand,
-                  const PairStatus pairStatus) {
-        inFMOcc.emplace_back(ranges, score, depth, strand, pairStatus);
-    }
-
-    /**
-     * @brief Adds an in-index occurrence to the collection.
-     *
-     * @param currentNode The current FM position and extension of the
-     * occurrence.
-     * @param score The score of the occurrence.
-     * @param strand The strand of the occurrence.
-     * @param pairStatus The pair status of the read.
-     */
-    void addFMOcc(const FMPosExt& currentNode, const length_t& score,
-                  const Strand strand, const PairStatus pairStatus) {
-        inFMOcc.emplace_back(currentNode, score, strand, pairStatus);
-    }
-
-    /**
      * @brief Adds an in-text occurrence to the collection.
      *
      * @param occ The in-text occurrence to add.
      */
     void addTextOcc(const TextOcc& occ) {
         inTextOcc.emplace_back(occ);
-    }
-
-    /**
-     * @brief Adds an in-text occurrence to the collection.
-     *
-     * @param range The range of the occurrence in the text.
-     * @param score The score of the occurrence.
-     * @param CIGAR The CIGAR string of the occurrence.
-     * @param strand The strand of the occurrence.
-     * @param pairStatus The pair status of the read.
-     */
-    void addTextOcc(const Range& range, const length_t& score,
-                    const std::string& CIGAR, Strand strand,
-                    PairStatus pairStatus) {
-        inTextOcc.emplace_back(range, score, CIGAR, strand, pairStatus);
-    }
-
-    /**
-     * @brief Adds an in-text occurrence to the collection.
-     *
-     * @param range The range of the occurrence in the text.
-     * @param score The score of the occurrence.
-     * @param strand The strand of the occurrence.
-     * @param pairStatus The pair status of the read.
-     */
-    void addTextOcc(const Range& range, const length_t score, Strand strand,
-                    PairStatus pairStatus) {
-        inTextOcc.emplace_back(range, score, strand, pairStatus);
     }
 
     /**

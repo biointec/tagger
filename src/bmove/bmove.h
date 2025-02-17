@@ -34,7 +34,6 @@
 #include <string>
 #include <vector>
 class MemoryMappedTextFile;
-class Search;
 class Substring;
 
 class BMove : public IndexInterface {
@@ -300,8 +299,9 @@ class BMove : public IndexInterface {
                     std::unordered_map<uint16_t, int64_t>& lastSeenPositions,
                     length_t& totalWeight) const override;
 
+#ifdef GROUND_TRUTH_CHECKS
     virtual uint16_t
-    getCorrectTag(const std::string& refID) const override { // todolore
+    getCorrectTag(const std::string& refID) const override {
         // Find the last underscore
         size_t underscorePos = refID.find_last_of('_');
         assert(underscorePos != std::string::npos &&
@@ -324,6 +324,7 @@ class BMove : public IndexInterface {
 
         return static_cast<uint16_t>(value);
     }
+#endif // GROUND_TRUTH_CHECKS
 };
 
 #endif // BMOVE_H

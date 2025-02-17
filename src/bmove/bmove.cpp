@@ -34,7 +34,6 @@
 #include <stdexcept>           // for runti...
 #include <string>              // for string
 class MemoryMappedTextFile;
-class Search;
 class Substring;
 
 using namespace std;
@@ -430,7 +429,7 @@ int64_t BMove::findMEMEndWithLookup(const std::string& read, int64_t i,
     SARange range = ranges.getRangeSARev();
 
     if (range.empty()) {
-        return j - 1; // TODO: Do we lose a lot of time here?
+        return j - 1;
     }
 
     assert(i >= 0);

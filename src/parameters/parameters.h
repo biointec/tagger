@@ -22,8 +22,6 @@ enum ArgumentType { STRING, INTEGER, NONE };
 enum OptionType {
     REQUIRED,
     PARALLELIZATION,
-    ALIGNMENT,
-    PAIRED_END_OPTION,
     OUTPUT,
     BUILD_INPUT_FILE,
     BUILD_OUTPUT_FILE,
@@ -43,10 +41,6 @@ inline std::string optionTypeToString(OptionType type) {
         return "Required";
     case PARALLELIZATION:
         return "Parallelization";
-    case ALIGNMENT:
-        return "Alignment";
-    case PAIRED_END_OPTION:
-        return "Paired-end";
     case OUTPUT:
         return "Output";
     case ADVANCED:

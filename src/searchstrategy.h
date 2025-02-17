@@ -23,10 +23,9 @@
 #define SEARCHSTRATEGY_H
 
 #include "definitions.h"    // for length_t, MappingMode, Distance...
-#include "indexhelpers.h"   // for TextOcc, PairedTextOccs, Occurrences
+#include "indexhelpers.h"   // for TextOcc, Occurrences
 #include "indexinterface.h" // for the IndexInterface
-#include "reads.h"          // for ReadPair, ReadBundle
-#include "search.h"         // for Search, SearchScheme
+#include "reads.h"          // for ReadBundle
 #include "substring.h"      // for Substring
 
 #include <algorithm> // for max, move, min
@@ -159,8 +158,7 @@ class SearchStrategy {
                                          const length_t minMEMLength) const {
         std::vector<TextOcc> occs;
 #ifdef GROUND_TRUTH_CHECKS
-        uint16_t correctTag = index.getCorrectTag(readBundle.getSeqID()); //todolore
-        assert(correctTag < 9118); // todolore hardcoded
+        uint16_t correctTag = index.getCorrectTag(readBundle.getSeqID());
 #else
         uint16_t correctTag = 0;
 #endif

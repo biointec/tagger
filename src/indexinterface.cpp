@@ -24,8 +24,6 @@
 #include "indexhelpers.h"
 #include "logger.h"
 
-#include "search.h" // for Search
-
 #include <assert.h>                 // for assert
 #include <cstdint>                  // for uint16_t
 #include <fmt/format.h>             // for fmt::to_string
@@ -249,7 +247,7 @@ bool IndexInterface::exactMatchesOutput(const string& s, Counters& counters,
         counters.inc(Counters::NODE_COUNTER);
     }
 
-    tOcc.emplace_back(range, 0, FORWARD_STRAND, FIRST_IN_PAIR);
+    tOcc.emplace_back(range, 0, FORWARD_STRAND);
 
     counters.inc(Counters::TOTAL_REPORTED_POSITIONS, tOcc.size());
     return tOcc.size() > 0;

@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 #ifndef DEFINITIONS_H
-#define DEFINITIONS_H //todolore
+#define DEFINITIONS_H
 
 #include <cstdint>
 
@@ -68,29 +68,7 @@ typedef uint64_t length_t;
  */
 enum Direction { FORWARD, BACKWARD };
 
-/**
- * Helper enum for finding the sequence name corresponding to the match of a
- * read.
- */
-enum SeqNameFound { FOUND, FOUND_WITH_TRIMMING, NOT_FOUND };
-
-// An enum for the partition strategies
-enum PartitionStrategy { UNIFORM, STATIC, DYNAMIC };
-// An enum for which distance metric to use
-enum DistanceMetric { HAMMING, EDIT };
-// An enum for the mapping mode
-enum MappingMode { BEST, ALL };
-
-// An enum for single or paired end reads
-enum SequencingMode { SINGLE_END, PAIRED_END };
-
-// An enum for the orientation of the paired end reads
-enum Orientation { FR, RF, FF };
-
 // An enum for the strand of the read
 enum Strand { FORWARD_STRAND = 0, REVERSE_C_STRAND = 1 };
-
-// An enum for the status in the pair of the read
-enum PairStatus { FIRST_IN_PAIR = 0, SECOND_IN_PAIR = 1 };
 
 #endif // DEFINITIONS_H

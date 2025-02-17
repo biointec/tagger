@@ -51,8 +51,6 @@ typedef enum {
     FASTA_GZ,
     SAM,
     SAM_GZ,
-    RHS, // read hit summary
-    RHS_GZ,
     OUT,
     UNKNOWN_FT
 } FileType;

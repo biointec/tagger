@@ -54,7 +54,6 @@ add_definitions(-DALPHABET=6)
 set(SOURCE_FILES
     src/indexhelpers.cpp
     src/nucleotide.cpp
-    src/search.cpp
     src/logger.cpp
     src/parameters/alignparameters.cpp
     src/indexinterface.cpp

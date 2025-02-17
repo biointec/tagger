@@ -22,8 +22,8 @@
 #ifndef FASTQ_H
 #define FASTQ_H
 
-#include "definitions.h"  // for SequencingMode, length_t
-#include "indexhelpers.h" // for TextOcc, PairedTextOccs, Counters
+#include "definitions.h"  // for length_t
+#include "indexhelpers.h" // for TextOcc, Counters
 #include "reads.h"        // for Read
 #include "seqfile.h"      // for FileType
 
@@ -65,11 +65,7 @@ class SequenceRecord : public ReadBundle {
      */
     bool readFromFileFASTQ(SeqFile& input);
 
-    void writeToFileFASTA(SeqFile& input) const;
-    void writeToFileFASTQ(SeqFile& input) const;
-
     std::function<bool(SeqFile&)> readFunc;
-    std::function<void(SeqFile&)> writeFunc;
 
   public:
     bool readFromFile(SeqFile& input) {
@@ -80,19 +76,11 @@ class SequenceRecord : public ReadBundle {
         return false;
     }
 
-    void writeToFile(SeqFile& input) const {
-        writeFunc(input);
-    }
-
     SequenceRecord(bool fastq) : ReadBundle() {
         readFunc = fastq ? std::bind(&SequenceRecord::readFromFileFASTQ, this,
                                      std::placeholders::_1)
                          : std::bind(&SequenceRecord::readFromFileFASTA, this,
                                      std::placeholders::_1);
-        writeFunc = fastq ? std::bind(&SequenceRecord::writeToFileFASTQ, this,
-                                      std::placeholders::_1)
-                          : std::bind(&SequenceRecord::writeToFileFASTA, this,
-                                      std::placeholders::_1);
         // convert read to upper case
         std::transform(read.begin(), read.end(), read.begin(), ::toupper);
     }
@@ -103,9 +91,8 @@ class SequenceRecord : public ReadBundle {
 // ============================================================================
 
 /**
- * A read block object contains a number of single-end or paired-end reads
- * that are read from file(s). In case of paired-end reads, the reads are
- * stored in an interleaved manner. In general, a readBlock consists of
+ * A read block object contains a number of single-end reads
+ * that are read from file(s). In general, a readBlock consists of
  * multiple read chunks.
  */
 class ReadBlock : public std::vector<SequenceRecord> {
@@ -148,44 +135,17 @@ class ReadBlock : public std::vector<SequenceRecord> {
     /**
      * Get next available input record chunk
      * @param buffer Record buffer to write to (contents will be appended)
-     * @param pairedEnd If true, buffer.size() will always be even
      */
-    void getNextChunk(std::vector<ReadBundle>& buffer, bool pairedEnd);
+    void getNextChunk(std::vector<ReadBundle>& buffer);
 
     /**
-     * Read a block from file (paired-end reads)
-     * @param file1 First fastq file
-     * @param file2 First fastq file
-     * @param targetBlockSize Desired number of nucleotides in this block
-     * @param fastq1 True if the first file is a fastq file, false if it is a
-     * fasta file
-     * @param fastq2 True if the second file is a fastq file, false if it is a
-     * fasta file
-     */
-    void readFromFile(SeqFile& file1, SeqFile& file2, size_t targetBlockSize,
-                      bool fastq1, bool fastq2);
-
-    /**
-     * Read a block from file (paired-end reads)
+     * Read a block from file (single-end reads)
      * @param file1 Fastq file
      * @param targetBlockSize Desired number of nucleotides in this block
      * @param fastq True if the file is a fastq file, false if it is a fasta
      * file
      */
     void readFromFile(SeqFile& file1, size_t targetBlockSize, bool fastq);
-
-    /**
-     * Write a block to file (paired-end reads)
-     * @param file1 First fastq file
-     * @param file2 First fastq file
-     */
-    void writeToFile(SeqFile& file1, SeqFile& file2);
-
-    /**
-     * Write a block to file (paired-end reads)
-     * @param file Fastq file
-     */
-    void writeToFile(SeqFile& file);
 
     /**
      * Return the target chunk size that was used in this block
@@ -213,7 +173,7 @@ class ReadBlock : public std::vector<SequenceRecord> {
  * @brief Class for reading FASTQ or FASTA files.
  *
  * The Reader class provides functionality for reading FASTQ/FASTA files,
- * both single-end and paired-end reads. It supports multithreaded reading,
+ * single-end reads. It supports multithreaded reading,
  * allowing for efficient processing of large FASTQ/FASTA datasets.
  */
 class Reader {
@@ -222,15 +182,8 @@ class Reader {
     FileType fileType1;        // file type (FASTQ, FASTQ.GZ, FASTA, FASTA.GZ)
     std::string baseFilename1; // file name w/o extension /1
 
-    std::string filename2;     // name of the input file /2
-    FileType fileType2;        // file type (FASTQ, FASTQ.GZ, FASTA, FASTA.GZ)
-    std::string baseFilename2; // file name w/o extension /2
-
     bool fastq1 = true; // true if first file is fastq, false otherwise
     bool fastq2 = true; // true if second file is fastq, false otherwise
-
-    bool pairedEnd; // true for paired-end reads, false
-                    // for single-end reads (ignore file 2)
 
     const int numReadBlocks = 2; // number of read blocks
 
@@ -270,9 +223,8 @@ class Reader {
     /**
      * Default constructor.
      * @param filename1 Name of the input file /1.
-     * @param filename2 Name of the input file /2.
      */
-    Reader(const std::string& filename1, const std::string& filename2);
+    Reader(const std::string& filename1);
 
     /**
      * Return the filename without the extension /1.
@@ -280,14 +232,6 @@ class Reader {
      */
     std::string getBaseFilename1() const {
         return baseFilename1;
-    }
-
-    /**
-     * Return the filename without the extension /2.
-     * @return The filename without the extension.
-     */
-    std::string getBaseFilename2() const {
-        return baseFilename2;
     }
 
     /**
@@ -327,17 +271,12 @@ class Reader {
 
 /**
  * An output record object contains the non-redundant occurrences for a single
- * read or read-pair. In case of paired-end reads, both paired and unpaired
- * occurrences are present.
+ * read. 
  */
 class OutputRecord {
   public:
     std::shared_ptr<std::vector<TextOcc>>
-        outputOcc; // The non-redundant occurrences for this record if SE
-    std::shared_ptr<std::vector<TextOcc>>
-        unpairedOcc; // unpaired occurrences if PE
-    std::shared_ptr<std::vector<PairedTextOccs>>
-        pairOcc; // The non-redundant occurrences for this record if PE
+        outputOcc; // The non-redundant occurrences for this record
 
     /**
      * Constructor with single-end occurrences
@@ -346,27 +285,14 @@ class OutputRecord {
         : outputOcc(std::make_shared<std::vector<TextOcc>>(occurrences)) {
     }
 
-    /**
-     * Constructor with paired-end occurrences
-     */
-    OutputRecord(const std::vector<PairedTextOccs>& pairedOccurrences,
-                 const std::vector<TextOcc>& unpairedOcc)
-        : unpairedOcc(std::make_shared<std::vector<TextOcc>>(unpairedOcc)),
-          pairOcc(std::make_shared<std::vector<PairedTextOccs>>(
-              pairedOccurrences)) {};
-
     // Move constructor
     OutputRecord(OutputRecord&& other) noexcept
-        : outputOcc(std::move(other.outputOcc)),
-          unpairedOcc(std::move(other.unpairedOcc)),
-          pairOcc(std::move(other.pairOcc)) {};
+        : outputOcc(std::move(other.outputOcc)) {};
 
     // Move assignment operator
     OutputRecord& operator=(OutputRecord&& other) noexcept {
         if (this != &other) {
             outputOcc = std::move(other.outputOcc);
-            unpairedOcc = std::move(other.unpairedOcc);
-            pairOcc = std::move(other.pairOcc);
         }
         return *this;
     }
@@ -462,10 +388,6 @@ class OutputChunk {
         records.emplace_back(std::move(occ));
     }
 
-    void addPairedEndRecord(std::vector<PairedTextOccs>&& pairedOcc,
-                            std::vector<TextOcc>&& unpairedOcc) {
-        records.emplace_back(std::move(pairedOcc), std::move(unpairedOcc));
-    }
     /**
      * @returns true if this is an end OutputChunk
      */
@@ -547,7 +469,6 @@ class OutputWriter {
                             // the header from
     std::string commandLineParameters; // The command line parameters with
                                        // which the program was started
-    const SequencingMode sMode; // The sequencing mode (paired- or single-end)
 
     // output thread variables (protect by outputMutex)
     std::mutex outputMapMutex;           // output thread mutex
@@ -593,12 +514,10 @@ class OutputWriter {
      * header from
      * @param commandLineParameters the command line parameters with which the
      * program was started
-     * @param sMode the sequencing mode (paired- or single-end)
      * @param reorder whether to keep original order
      */
     OutputWriter(const std::string& writeFile, const std::string& headerFile,
-                 const std::string& commandLineParameters,
-                 const SequencingMode& sMode, bool reorder);
+                 const std::string& commandLineParameters, bool reorder);
 
     /**
      * Start writer thread.

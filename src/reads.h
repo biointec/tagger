@@ -151,7 +151,6 @@ class ReadBundle : public Read {
           reverseComplement(Nucleotide::getRevComplWithN(read.getRead())),
           revQuality("") {
         // leave reverse quality untouched for now, only consider it when needed
-        // TODO: check if getRevComplWithN is  a performance bottleneck
     }
 
     const std::string& getRevComp() const {
@@ -188,57 +187,6 @@ class ReadBundle : public Read {
     static ReadBundle createBundle(const std::string& seq,
                                    const Strand strand) {
         return ReadBundle(seq, strand == Strand::REVERSE_C_STRAND);
-    }
-};
-
-/**
- * A pair of reads for paired-end alignment.
- */
-class ReadPair {
-  private:
-    ReadBundle read1;
-    ReadBundle read2;
-
-  public:
-    ReadBundle& getBundle1() {
-        return read1;
-    }
-
-    ReadBundle& getBundle2() {
-        return read2;
-    }
-
-    const std::string& getRead1() const {
-        return read1.getRead();
-    }
-
-    const std::string& getRead2() const {
-        return read2.getRead();
-    }
-
-    const std::string& getRevComp1() const {
-        return read1.getRevComp();
-    }
-
-    const std::string& getRevComp2() const {
-        return read2.getRevComp();
-    }
-
-    ReadPair(ReadBundle read1, ReadBundle read2) : read1(read1), read2(read2) {
-    }
-
-    /**
-     * Get the sequence of the read along the correct strand and with the
-     * correct pair status
-     * @param strand the strand to get the sequence for
-     * @param status the pair status (first or second in pair) to get the
-     * sequence for
-     * @return the sequence of the read along the correct strand and with the
-     * correct pair status
-     */
-    const std::string& getSequence(Strand strand, PairStatus status) const {
-        return (status == FIRST_IN_PAIR) ? read1.getSequence(strand)
-                                         : read2.getSequence(strand);
     }
 };
 
