@@ -181,7 +181,7 @@ echo "-------------------------------------------------------------"
 
 # Start building the tagger index
 echo "Start building the tagger index..."
-pfp_args=("$tagger_build_exe" --pfp -r "$index_name")
+pfp_args=("$tagger_build_exe" --pfp -r "$index_name" --taggingcategories "$taggingCategories")
 if [ "${#maxLFValues[@]}" -gt 0 ]; then
 	pfp_args+=(-M "${maxLFValues[@]}")
 fi
