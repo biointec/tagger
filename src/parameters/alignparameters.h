@@ -5,7 +5,7 @@
 #include "parameters.h"
 
 // forward declaration
-class SearchStrategy;
+class ClassificationStrategy;
 class IndexInterface;
 
 /**
@@ -59,7 +59,7 @@ struct Parameters : public ParametersInterface {
      * @param index Pointer to he index to search in
      * @return The search strategy
      */
-    std::unique_ptr<SearchStrategy> createStrategy(IndexInterface& index) const;
+    std::unique_ptr<ClassificationStrategy> createStrategy(IndexInterface& index) const;
 };
 
 class ParameterOption : public Option {

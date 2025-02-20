@@ -1,7 +1,7 @@
 #include "alignparameters.h"
 #include "../indexinterface.h"
 #include "../logger.h"
-#include "../searchstrategy.h"
+#include "../classificationstrategy.h"
 #include "parameters.h"
 #include <algorithm>
 #include <thread> // for thread
@@ -305,11 +305,11 @@ Parameters Parameters::processOptionalArguments(int argc, char** argv) {
     return params;
 }
 
-std::unique_ptr<SearchStrategy>
+std::unique_ptr<ClassificationStrategy>
 Parameters::createStrategy(IndexInterface& index) const {
-    std::unique_ptr<SearchStrategy> strategy;
+    std::unique_ptr<ClassificationStrategy> strategy;
 
-    strategy.reset(new SearchStrategy(index));
+    strategy.reset(new ClassificationStrategy(index));
 
     return strategy;
 }

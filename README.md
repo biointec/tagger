@@ -149,7 +149,7 @@ This project is licensed under the **AGPL-3.0 License**. See the [LICENSE](./LIC
 
 ### Dependencies  
 
-In addition to the aforementioned dependencies, SDSL and Big-BWT, **tagger** also builds upon the foundation of the [b-move](https://github.com/biointec/b-move) implementation.  
+In addition to the aforementioned dependencies, SDSL and Big-BWT, **tagger** also builds upon the foundation of the [Columba](https://github.com/biointec/columba) and [b-move](https://github.com/biointec/b-move) implementations.  
 
 **tagger** further relies on the following libraries:  
 - **[{fmt} library](https://github.com/fmtlib/fmt)**: Falls under the exception of its license.  

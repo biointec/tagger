@@ -27,7 +27,7 @@
 #include "logger.h"                     // for Logger, logger
 #include "parameters/alignparameters.h" // for Parameters
 #include "reads.h"                      // for ReadPair, Read, ReadBundle
-#include "searchstrategy.h"             // for SearchStrategy
+#include "classificationstrategy.h"     // for ClassificationStrategy
 
 #include <algorithm>  // for max, copy, for_each, count, sort
 #include <assert.h>   // for assert
@@ -62,7 +62,7 @@ using namespace std;
  * matches
  */
 void processChunk(vector<ReadBundle>& input, OutputChunk& output,
-                  std::unique_ptr<SearchStrategy>& strategy,
+                  std::unique_ptr<ClassificationStrategy>& strategy,
                   const length_t& minMEMLength) {
     output.clear();
     output.reserve(input.size());
@@ -84,7 +84,7 @@ void processChunk(vector<ReadBundle>& input, OutputChunk& output,
  * the matches
  */
 void threadEntrySingleEnd(Reader& myReader, OutputWriter& myWriter,
-                          std::unique_ptr<SearchStrategy>& strategy,
+                          std::unique_ptr<ClassificationStrategy>& strategy,
                           length_t& maxEDOrIdentity) {
     // local storage of reads
     vector<ReadBundle> input;
@@ -121,7 +121,7 @@ void threadEntrySingleEnd(Reader& myReader, OutputWriter& myWriter,
  */
 void logAlignmentParameters(const Parameters& params,
                             const IndexInterface& index,
-                            const std::unique_ptr<SearchStrategy>& strategy) {
+                            const std::unique_ptr<ClassificationStrategy>& strategy) {
     stringstream ss;
     ss << "Finding maximal exact matches...\n";
     ss << "\tMinimum MEM length: " << params.minMEMLength << "\n";
@@ -199,14 +199,14 @@ std::unique_ptr<BMove> createBMove(const Parameters& params) {
 }
 
 /**
- * @brief Creates a SearchStrategy object.
+ * @brief Creates a ClassificationStrategy object.
  *
  * @param params Parameters object containing necessary parameters.
  * @param index Reference to IndexInterface object.
- * @return std::unique_ptr<SearchStrategy> Pointer to the created SearchStrategy
+ * @return std::unique_ptr<ClassificationStrategy> Pointer to the created ClassificationStrategy
  * object, or nullptr on failure (error will be logged).
  */
-std::unique_ptr<SearchStrategy> createSearchStrategy(const Parameters& params,
+std::unique_ptr<ClassificationStrategy> createClassificationStrategy(const Parameters& params,
                                                      IndexInterface& index) {
     try {
         return params.createStrategy(index);
@@ -264,12 +264,12 @@ std::unique_ptr<OutputWriter> createOutputWriter(const Parameters& params) {
  * @param workers Vector of worker threads.
  * @param reader Reference to Reader object.
  * @param writer Reference to OutputWriter object.
- * @param strategy Pointer to SearchStrategy object.
+ * @param strategy Pointer to ClassificationStrategy object.
  * @param minMEMLength Reference to length_t for max or identity parameter.
  */
 void startSingleEndWorkers(std::vector<std::thread>& workers, Reader& reader,
                            OutputWriter& writer,
-                           std::unique_ptr<SearchStrategy>& strategy,
+                           std::unique_ptr<ClassificationStrategy>& strategy,
                            length_t& minMEMLength) {
     for (size_t i = 0; i < workers.size(); i++) {
         workers[i] = std::thread(threadEntrySingleEnd, std::ref(reader),
@@ -288,13 +288,13 @@ void startSingleEndWorkers(std::vector<std::thread>& workers, Reader& reader,
  * @param params Parameters object containing necessary parameters.
  * @param reader Reference to Reader object.
  * @param writer Reference to OutputWriter object.
- * @param strategy Pointer to SearchStrategy object.
+ * @param strategy Pointer to ClassificationStrategy object.
  * @return true if worker threads start and process successfully.
  * @return false if there is an error during processing (error will be logged).
  */
 bool startWorkerThreads(Parameters& params, Reader& reader,
                         OutputWriter& writer,
-                        std::unique_ptr<SearchStrategy>& strategy) {
+                        std::unique_ptr<ClassificationStrategy>& strategy) {
     try {
         auto start = std::chrono::high_resolution_clock::now();
 
@@ -358,8 +358,8 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    std::unique_ptr<SearchStrategy> strategy =
-        createSearchStrategy(params, *indexPtr);
+    std::unique_ptr<ClassificationStrategy> strategy =
+        createClassificationStrategy(params, *indexPtr);
     if (!strategy) {
         return EXIT_FAILURE;
     }

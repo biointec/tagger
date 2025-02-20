@@ -19,8 +19,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.     *
  ******************************************************************************/
 
-#ifndef SEARCHSTRATEGY_H
-#define SEARCHSTRATEGY_H
+#ifndef CLASSIFICATIONSTRATEGY_H
+#define CLASSIFICATIONSTRATEGY_H
 
 #include "definitions.h"    // for length_t, MappingMode, Distance...
 #include "indexhelpers.h"   // for TextOcc, Occurrences
@@ -47,10 +47,10 @@
 #define PATH_SEPARATOR "/"
 
 // ============================================================================
-// CLASS SEARCHSTRATEGY
+// CLASS CLASSIFICATIONSTRATEGY
 // ============================================================================
 
-class SearchStrategy {
+class ClassificationStrategy {
 
     // ATTRIBUTES
     //-------------------------------------------------------------------------------
@@ -147,10 +147,10 @@ class SearchStrategy {
      * Constructor
      * @param index the index to be used
      */
-    SearchStrategy(IndexInterface& index) : index(index), global_gen(42) {
+    ClassificationStrategy(IndexInterface& index) : index(index), global_gen(42) {
     }
 
-    virtual ~SearchStrategy() {
+    virtual ~ClassificationStrategy() {
     }
 
     std::vector<TextOcc> taggingFunction(const ReadBundle& readBundle,
