@@ -74,7 +74,7 @@ bash tagger_build_pfp.sh -r <index_name> [-f <fasta_files>] [-F <fasta_file_list
 or  
 
 ```bash
-bash columba_build_pfp.sh -r <index_name> [-F <fasta_file_list>] [-w <ws>] [-p <mod>] [-t <taggingCategoriesFile>] [-M <maxLFSteps>]
+bash tagger_build_pfp.sh -r <index_name> [-F <fasta_file_list>] [-w <ws>] [-p <mod>] [-t <taggingCategoriesFile>] [-M <maxLFSteps>]
 ```
 
 Required argument:
