@@ -1565,8 +1565,7 @@ int indexConstructingAfterPFP(const BuildParameters& params) {
     logger.logInfo(
         "Starting index construction after prefix-free parsing step...");
 
-    std::array<string, 4> requiredExtensionsPFP = {".bwt", ".esa", ".ssa",
-                                                   ".rev.bwt"};
+    std::array<string, 3> requiredExtensionsPFP = {".bwt", ".esa", ".ssa"};
 
     for (auto& ext : requiredExtensionsPFP) {
         string filename = params.baseFN + ext;

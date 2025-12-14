@@ -165,19 +165,19 @@ runCommand "${big_bwt_args[@]}"
 echo "Prefix-free parsing done!"
 echo "-------------------------------------------------------------"
 
-# Adjust the arguments for the reverse string
-big_bwt_args=("$big_bwt_exe" -v "${base}.rev")
-if [ "$ws" -gt 0 ]; then
-	big_bwt_args+=(-w "$ws")
-fi
-if [ "$mod" -gt 0 ]; then
-	big_bwt_args+=(-p "$mod")
-fi
+# # Adjust the arguments for the reverse string
+# big_bwt_args=("$big_bwt_exe" -v "${base}.rev")
+# if [ "$ws" -gt 0 ]; then
+# 	big_bwt_args+=(-w "$ws")
+# fi
+# if [ "$mod" -gt 0 ]; then
+# 	big_bwt_args+=(-p "$mod")
+# fi
 
-echo "Start prefix-free parsing for the reverse string..."
-runCommand "${big_bwt_args[@]}"
-echo "Prefix-free parsing done!"
-echo "-------------------------------------------------------------"
+# echo "Start prefix-free parsing for the reverse string..."
+# runCommand "${big_bwt_args[@]}"
+# echo "Prefix-free parsing done!"
+# echo "-------------------------------------------------------------"
 
 # Start building the tagger index
 echo "Start building the tagger index..."
@@ -192,11 +192,11 @@ echo "-------------------------------------------------------------"
 # Remove the temporary files
 echo "Remove temporary files..."
 rm "${base}.bwt"
-rm "${base}.rev.bwt"
+# rm "${base}.rev.bwt"
 rm "${base}.ssa"
 rm "${base}.esa"
 rm "${base}.log"
-rm "${base}.rev.log"
+# rm "${base}.rev.log"
 rm "${base}"
 rm "${base}.rev"
 echo "Temporary files removed!"
