@@ -84,6 +84,9 @@ char replaceNonACGT(char original, std::minstd_rand& gen,
     const std::string validChars = "ACGT";
     if (original != 'A' && original != 'C' && original != 'G' &&
         original != 'T') {
+        throw std::runtime_error(
+            "Error: Found invalid character '" + std::string(1, original) +
+            "' in reference text. Only A, C, G, T characters are allowed.");
         if (!foundU && original == 'U') {
             foundU = true;
             logger.logWarning("Found 'U' in reference text. Is this an RNA "
@@ -221,13 +224,12 @@ void concatenateAndTransform(const std::string& fastaFile,
                     concatenation += c;
                 }
 
-                concatenation += 'X'; // Add a separator character
+                // concatenation += 'X'; // Add a separator character
 
                 positions.emplace_back(
                     startPosition); // push back the start position of this
                                     // sequence
-                startPosition += sequence.length() +
-                                 1; // create start position for next sequence
+                startPosition += sequence.length(); // create start position for next sequence
                 sequence.clear();   // Clear the sequence for the next one
             }
             std::string description = line.substr(1);
@@ -957,14 +959,14 @@ length_t createAndWriteMove(const string& baseFN, const string& BWT,
     length_t size = arraySize;
     logger.logInfo("There are " + to_string(size) + " runs.");
 
-    // Fill dPair and dIndex
-    MoveLFReprBP rows;
-    rows.setZeroCharPos(zeroCharPos);
-    fillRows(tIn, rows, size, BWT.size());
+    // // Fill dPair and dIndex
+    // MoveLFReprBP rows;
+    // rows.setZeroCharPos(zeroCharPos);
+    // fillRows(tIn, rows, size, BWT.size());
 
-    string moveFileName = baseFN + ".LFBP";
-    rows.write(moveFileName);
-    logger.logInfo("\tWrote file " + moveFileName);
+    // string moveFileName = baseFN + ".LFBP";
+    // rows.write(moveFileName);
+    // logger.logInfo("\tWrote file " + moveFileName);
 
     return size;
 }
@@ -1227,11 +1229,8 @@ void performSubSampling(const std::vector<int>& maxLFValues,
 void createTaggingData(const string& baseFN, const length_t& numberOfReferences,
                        const length_t& bwtSize, const SparseBitvec& predLast,
                        const vector<length_t>& samplesFirst,
-                       const vector<length_t>& samplesLast,
                        const vector<length_t>& lastToRun,
-                       const vector<length_t>& startPos,
-                       SparseBitvec& endOfBWTRun,
-                       const vector<int>& maxLFValues) {
+                       const vector<length_t>& startPos) {
     // Try to open the tagging files
     ifstream ifs(baseFN + ".reference.tags");
     if (ifs.is_open()) {
@@ -1247,8 +1246,11 @@ void createTaggingData(const string& baseFN, const length_t& numberOfReferences,
         vector<uint16_t> tagRunHeads;
         tagRunHeads.reserve(bwtSize);
 
-        vector<uint16_t> tagRunHeadsBWT;
-        tagRunHeadsBWT.reserve(endOfBWTRun.rank(bwtSize));
+        // vector<uint16_t> tagValues;
+        // tagValues.reserve(bwtSize);
+
+        // vector<uint16_t> tagRunHeadsBWT;
+        // tagRunHeadsBWT.reserve(endOfBWTRun.rank(bwtSize));
 
         length_t currentPos = bwtSize - 1;
 
@@ -1260,9 +1262,11 @@ void createTaggingData(const string& baseFN, const length_t& numberOfReferences,
         uint16_t currentTag = 0; // Sentinel character will never be accessed,
                                  // so tag does not matter here
 
-        if (endOfBWTRun[0]) {
-            tagRunHeadsBWT.push_back(currentTag);
-        }
+        // if (endOfBWTRun[0]) {
+        //     tagRunHeadsBWT.push_back(currentTag);
+        // }
+
+        // tagValues.push_back(currentTag);
 
         for (length_t i = 1; i < bwtSize; i++) {
 
@@ -1309,9 +1313,11 @@ void createTaggingData(const string& baseFN, const length_t& numberOfReferences,
                 currentTag = nextTag;
             }
 
-            if (endOfBWTRun[i]) {
-                tagRunHeadsBWT.push_back(currentTag);
-            }
+            // if (endOfBWTRun[i]) {
+            //     tagRunHeadsBWT.push_back(currentTag);
+            // }
+
+            // tagValues.push_back(currentTag);
 
             currentPos = nextPos;
         }
@@ -1325,16 +1331,23 @@ void createTaggingData(const string& baseFN, const length_t& numberOfReferences,
         SparseBitvec tagRunEndBV(tagRunEnd);
         assert(tagRunEndBV.rank(bwtSize) == tagRunHeads.size());
 
-        SparseBitvec sampledBWTEndRunTagsBV;
-        vector<uint16_t> sampledBWTEndRunTags;
-        performSubSampling(maxLFValues, samplesLast, tagRunHeadsBWT, baseFN,
-                           startPos);
+        // SparseBitvec sampledBWTEndRunTagsBV;
+        // vector<uint16_t> sampledBWTEndRunTags;
+        // performSubSampling(maxLFValues, samplesLast, tagRunHeadsBWT, baseFN,
+        //                    startPos);
 
-        assert(tagRunHeadsBWT.size() == endOfBWTRun.rank(bwtSize));
+        logger.logInfo("Writing tagging data to files...");
+        tagRunEndBV.write(baseFN + ".tag.bv");
+        logger.logInfo("Wrote file " + baseFN + ".tag.bv");
+
+        writeIntVectorBinary(baseFN + ".tag.heads", tagRunHeads);
+        logger.logInfo("Wrote file " + baseFN + ".tag.heads");
+
+        // assert(tagRunHeadsBWT.size() == endOfBWTRun.rank(bwtSize));
 
     } else {
-        logger.logDeveloper(
-            "No tagging data found. Skipping tagging data creation.");
+        logger.logError("Could not open " + baseFN + ".reference.tags");
+        exit(1);
     }
 }
 
@@ -1400,9 +1413,9 @@ void processSamplesAndPreds(const string& baseFN,
     logger.logInfo("Generating the predecessor bitvector for the samples...");
     generatePredecessors(samplesLast, predLast, BWT.size());
 
-    createTaggingData(baseFN, numberOfReferences, BWT.size(), predLast,
-                      samplesFirst, samplesLast, lastToRun, startPos, endOfRun,
-                      maxLFValues);
+    // createTaggingData(baseFN, numberOfReferences, BWT.size(), predLast,
+    //                   samplesFirst, samplesLast, lastToRun, startPos, endOfRun,
+    //                   maxLFValues);
 
     lastToRun.clear();
 }
@@ -1480,8 +1493,8 @@ void createIndexPFP(const string& baseFN, const length_t& numberOfReferences,
     vector<length_t> charCounts;
     countChars(BWT, charCounts);
 
-    // write the character counts table
-    writeCharCounts(baseFN, charCounts);
+    // // write the character counts table
+    // writeCharCounts(baseFN, charCounts);
 
     // Create the alphabet
     Alphabet<ALPHABET> sigma;
@@ -1517,36 +1530,35 @@ void createIndexPFP(const string& baseFN, const length_t& numberOfReferences,
             generatePredecessors(samplesLast, predLast, bwtSize);
 
             createTaggingData(baseFN, numberOfReferences, bwtSize, predLast,
-                              samplesFirst, samplesLast, lastToRun, startPos,
-                              endOfRun, maxLFValues);
+                              samplesFirst, lastToRun, startPos);
 
             firstToRun.clear();
         }
     }
 
-    logger.logInfo("Switching to reversed text...");
+    // logger.logInfo("Switching to reversed text...");
 
-    {
-        // build the BWT
-        string revBWT;
-        // Read the BWT from disk
-        logger.logInfo("Reading " + baseFN + ".rev.bwt...");
-        readText(baseFN + ".rev.bwt", revBWT);
+    // {
+    //     // build the BWT
+    //     string revBWT;
+    //     // Read the BWT from disk
+    //     logger.logInfo("Reading " + baseFN + ".rev.bwt...");
+    //     readText(baseFN + ".rev.bwt", revBWT);
 
-        replaceSentinel(revBWT);
+    //     replaceSentinel(revBWT);
 
-        SparseBitvec endOfRun;
+    //     SparseBitvec endOfRun;
 
-        // Create the Move structure
-        logger.logInfo("Creating the move table...");
-        createAndWriteMove(baseFN + ".rev", revBWT, charCounts, sigma,
-                           endOfRun);
+    //     // Create the Move structure
+    //     logger.logInfo("Creating the move table...");
+    //     createAndWriteMove(baseFN + ".rev", revBWT, charCounts, sigma,
+    //                        endOfRun);
 
-        // Clear the reverse BWT
-        revBWT.clear();
-    }
+    //     // Clear the reverse BWT
+    //     revBWT.clear();
+    // }
 
-    writeMetaInfo(baseFN);
+    // writeMetaInfo(baseFN);
 }
 
 int indexConstructingAfterPFP(const BuildParameters& params) {
