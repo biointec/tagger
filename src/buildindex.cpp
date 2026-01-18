@@ -83,10 +83,10 @@ char replaceNonACGT(char original, std::minstd_rand& gen,
                     const std::string& seed, size_t& seedIndex) {
     const std::string validChars = "ACGT";
     if (original != 'A' && original != 'C' && original != 'G' &&
-        original != 'T') {
+        original != 'T' && original != '#') {
         throw std::runtime_error(
             "Error: Found invalid character '" + std::string(1, original) +
-            "' in reference text. Only A, C, G, T characters are allowed.");
+            "' in reference text. Only A, C, G, T, # characters are allowed.");
         if (!foundU && original == 'U') {
             foundU = true;
             logger.logWarning("Found 'U' in reference text. Is this an RNA "
